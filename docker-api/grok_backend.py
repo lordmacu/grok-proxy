@@ -312,9 +312,17 @@ class _StreamCleaner:
         return text
 
     def flush(self) -> str:
-        # Extract grok:render blocks from the full raw stream
+        # Rescan raw buffer to catch any renders feed() might have missed
         for m in _GROK_RENDER_RE.finditer(self._raw):
             self.renders.append((m.group(1), m.group(2)))
+        # Deduplicate by card_id — feed() and flush() may both have detected the same block
+        seen: set = set()
+        deduped = []
+        for card_id, file_path in self.renders:
+            if card_id not in seen:
+                seen.add(card_id)
+                deduped.append((card_id, file_path))
+        self.renders = deduped
         rest = _strip_xai(self._buf)
         rest = re.sub(r'</?grok:[^>]*>', '', rest, flags=re.DOTALL)
         self._buf    = ""
@@ -638,17 +646,18 @@ def _build_chat_request(
     """
     Construye CreateConversationAndRespondRequest como bytes proto raw.
 
-    Campos confirmados:
+    Campos confirmados (APK jadx_out verificado):
       f3  = temporary (bool)       — conversación efímera, no aparece en historial
       f4  = model_name (string)
       f5  = message (string)
-      f6  = file_attachments (repeated string) — IDs de imágenes subidas vía UploadFile
+      f6  = file_attachments (repeated string) — IDs de documentos (pdf, docx, xlsx…)
+      f7  = image_attachments (repeated string) — IDs de imágenes subidas vía UploadFile
       f8  = disable_search (bool)
       f19 = custom_instructions (string) — system prompt nativo
       f20 = custom_personality (string)
       f32 = is_reasoning (bool)
       f40 = do_force_trigger_artifact (bool) — fuerza generación de bloque de código
-      f74 = enabled_skills (repeated int32) — IDs de skill type: 1=docx,3=pdf,4=pptx,7=xlsx
+      f74 = enabled_skills (packed repeated int32) — IDs de skill type: 1=docx,3=pdf,4=pptx,7=xlsx
     """
     req = _str_field(4, model_id) + _str_field(5, prompt) + _bool_field(8, disable_search)
     if temporary:
@@ -661,7 +670,7 @@ def _build_chat_request(
         req += _str_field(20, personality)
     if image_file_ids:
         for fid in image_file_ids:
-            req += _str_field(6, fid)
+            req += _str_field(7, fid)  # f7=image_attachments, not f6=file_attachments
     if force_artifact:
         req += _bool_field(40, True)
     if enabled_skills:
@@ -702,7 +711,7 @@ def stream_chat(
     Genera tokens limpios de texto. Rota modelo si RESOURCE_EXHAUSTED.
     system          → custom_instructions (f19, system prompt nativo)
     personality     → custom_personality (f20)
-    image_file_ids  → IDs de imágenes subidas vía UploadFile (f6)
+    image_file_ids  → IDs de imágenes subidas vía UploadFile (f7=image_attachments)
     temporary       → conversación efímera, no aparece en historial (f3)
     force_artifact  → fuerza bloque de código en la respuesta (f40)
     enabled_skills  → lista de skill_type IDs a activar (f74): 1=docx,3=pdf,4=pptx,7=xlsx
@@ -784,38 +793,217 @@ def complete_chat(
     ))
 
 
+def get_imagine_quota() -> dict:
+    """
+    Llama grok_api.Media/GetImagineQuotaInfo.
+    Retorna dict con 5 buckets de cuota de imagen:
+      image      → fast mode (quality_mode="fast")
+      image_pro  → quality mode (quality_mode="quality")
+      image_edit → edición de imágenes
+      video      → generación de video
+      video_720p → video 720p
+
+    Cada bucket:
+      available     (bool)   — si hay cuota disponible
+      remaining     (int)    — queries restantes
+      window_secs   (int)    — ventana de tiempo (86400 = 24h)
+      next_available_at (str|None) — ISO 8601 UTC del próximo reset
+    """
+    import datetime
+
+    def _parse_quota_bucket(raw: bytes) -> dict:
+        f = _decode_proto(raw)
+        available = bool(_first_int(f, 1))
+        remaining = _first_int(f, 2)   # proto3 omits INT32=0; _first_int returns 0 → correct
+        window = _first_int(f, 3)
+        next_at = None
+        for kind, val in f.get(4, []):
+            data = val if kind == 'raw' else (val.encode('latin-1') if kind == 'str' else b'')
+            if data:
+                tf = _decode_proto(data)
+                secs = _first_int(tf, 1)
+                if secs:
+                    try:
+                        dt = datetime.datetime.utcfromtimestamp(secs)
+                        next_at = dt.isoformat() + 'Z'
+                    except Exception:
+                        pass
+        return {
+            "available":        available,
+            "remaining":        remaining,
+            "window_secs":      window,
+            "next_available_at": next_at,
+        }
+
+    BUCKET_NAMES = {1: "image", 2: "image_pro", 3: "image_edit", 4: "video", 5: "video_720p"}
+    result = {}
+    try:
+        raw = _raw_unary("/grok_api.Media/GetImagineQuotaInfo", b"", timeout=10)
+        f   = _decode_proto(raw)
+        for tag, entries in f.items():
+            name = BUCKET_NAMES.get(tag)
+            if name:
+                for kind, val in entries:
+                    data = val if kind == 'raw' else (val.encode('latin-1') if kind == 'str' else b'')
+                    if data:
+                        result[name] = _parse_quota_bucket(data)
+    except Exception:
+        pass
+    # Rellenar buckets ausentes con valores por defecto
+    for name in BUCKET_NAMES.values():
+        result.setdefault(name, {"available": False, "remaining": 0,
+                                  "window_secs": 86400, "next_available_at": None})
+    return result
+
+
+def _build_imagine_request_raw(
+    prompt: str,
+    quality_mode: str = "fast",
+    model_name: str = "imagine-image-gen",
+    num_images: int = 1,
+    aspect_ratio: Optional[str] = None,
+) -> bytes:
+    """
+    Construye CreateConversationAndRespondRequest para generación de imagen
+    via media_gen_input (f79) — camino V2 descubierto en el APK.
+
+    Ventaja: quality_mode="fast" y "quality" consumen buckets distintos
+    (image vs image_pro en GetImagineQuotaInfo).
+
+    Estructura proto:
+      f5  = message/prompt (string)
+      f8  = disable_search (bool, true)
+      f12 = enable_image_streaming (bool, true)
+      f79 = MediaGenInput {
+               f1 = TextToImage {
+                      f1 = prompt
+                      f2 = num_of_images
+                      f3 = aspect_ratio (opcional)
+                      f5 = model_name
+                      f6 = quality_mode ("fast" | "quality")
+              }
+           }
+      f80 = ConversationKind.IMAGINE = 1
+    """
+    # TextToImage (grok_media_gen.TextToImage / rc0.t)
+    tti = _str_field(1, prompt)
+    if num_images and num_images != 1:
+        tti += _int_field(2, num_images)
+    if aspect_ratio:
+        tti += _str_field(3, aspect_ratio)
+    tti += _str_field(5, model_name)
+    tti += _str_field(6, quality_mode)
+
+    # MediaGenInput (grok_media_gen.MediaGenInput / rc0.j)
+    media_gen = _nested_field(1, tti)
+
+    return (
+        _str_field(5, prompt)
+        + _bool_field(8, True)           # disable_search
+        + _bool_field(12, True)          # enable_image_streaming
+        + _nested_field(79, media_gen)   # media_gen_input
+        + _int_field(80, 1)              # ConversationKind.IMAGINE
+    )
+
+
 def generate_image(
     prompt: str,
     model_id: Optional[str] = None,
+    quality_mode: Optional[str] = None,
     timeout: int = 180,
 ) -> list[dict]:
     """
     Genera imágenes usando los modelos Imagine de Grok (Aurora).
-    Rota entre los 3 imagine-agent variants si uno está rate-limited.
-    Retorna lista de dicts con {url, image_id, asset_id, progress, moderated}.
-    Lanza RuntimeError solo si TODOS los imagine models están rate-limited.
+
+    Estrategia (en orden):
+    1. Consulta GetImagineQuotaInfo para saber cuáles buckets tienen cuota.
+    2. Intenta el camino V2 (media_gen_input f79):
+       - quality_mode="fast"    si el bucket "image"     tiene remaining > 0
+       - quality_mode="quality" si el bucket "image_pro" tiene remaining > 0
+    3. Si V2 también falla, rota entre imagine-agent-mode variants (V1 clásico).
+    4. Si todos fallan, lanza RuntimeError con el tiempo de reset.
+
+    quality_mode puede forzarse: "fast" o "quality".
+    Retorna lista de dicts con {url, image_id, asset_id, progress, moderated, model, mode}.
     """
+    # ── 1. Consultar cuota disponible ─────────────────────────────────────────
+    quota = get_imagine_quota()
+    image_ok   = (quota["image"].get("remaining") or 0) > 0
+    pro_ok     = (quota["image_pro"].get("remaining") or 0) > 0
+    next_reset = quota["image_pro"].get("next_available_at") or quota["image"].get("next_available_at")
+
+    # ── 2. Elegir modo automático si no se fuerza ─────────────────────────────
+    if quality_mode is None:
+        if image_ok:
+            quality_mode = "fast"
+        elif pro_ok:
+            quality_mode = "quality"
+        # Si ninguno tiene cuota, igual intentamos (el servidor dará el error exacto)
+        else:
+            quality_mode = "fast"
+
+    # ── 3. Intentar vía media_gen_input (V2 — two separate quota buckets) ────
+    req_v2 = _build_imagine_request_raw(
+        prompt,
+        quality_mode=quality_mode,
+        model_name="imagine-image-gen",
+        num_images=1,
+    )
+    images_v2 = []
+    v2_error  = None
+    try:
+        for raw_chunk in _raw_stream(
+            "/grok_api.Chat/CreateConversationAndRespond", req_v2, timeout=timeout
+        ):
+            f = _decode_proto(raw_chunk)
+            # Mismo parsing de URLs de imagen que V1 (streaming_image_generation_response)
+            for kind, val in f.get(1, []):
+                data  = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+                inner = _decode_proto(data)
+                for kind2, val2 in inner.get(12, []):
+                    img_data = val2.encode('latin-1') if kind2 == 'str' else (val2 if kind2 == 'raw' else b'')
+                    img_f = _decode_proto(img_data)
+                    url   = _first_str(img_f, 1)
+                    if url:
+                        # StreamingImageGenerationResponse (APK confirmed):
+                        # f1=image_url f2=seq f3=progress f4=moderated f5=image_id f7=asset_id f9=r_rated
+                        images_v2.append({
+                            "url":       url,
+                            "image_id":  _first_str(img_f, 5),
+                            "asset_id":  _first_str(img_f, 7),
+                            "progress":  _first_int(img_f, 3),
+                            "moderated": bool(_first_int(img_f, 4)),
+                            "r_rated":   bool(_first_int(img_f, 9)),
+                            "model":     "imagine-image-gen",
+                            "mode":      quality_mode,
+                        })
+    except grpc.RpcError as e:
+        v2_error = str(e.details())
+        # RESOURCE_EXHAUSTED → caer al path V1
+        if e.code() != grpc.StatusCode.RESOURCE_EXHAUSTED:
+            raise
+
+    if images_v2:
+        return images_v2
+
+    # ── 4. Fallback V1: imagine-agent-mode variants ───────────────────────────
     ch   = get_channel()
     stub = gg.ChatStub(ch)
 
-    # "auto" o None → rotar entre los 3 imagine-agent
-    # modelo específico del pool → usarlo directamente
     if not model_id or model_id in IMAGE_ALIASES or model_id not in IMAGE_POOL:
         pool = IMAGE_POOL
     else:
         pool = [model_id]
 
-    last_error = None
-    for attempt, mid in enumerate(pool):
+    last_error = v2_error
+    for mid in pool:
         req = ga.CreateConversationAndRespondRequest(
             model_name=mid,
             message=prompt,
             disable_search=True,
         )
-
         images   = []
         text_buf = []
-
         try:
             for chunk in stub.CreateConversationAndRespond(
                 req, metadata=_make_meta(), timeout=timeout
@@ -833,6 +1021,7 @@ def generate_image(
                         "moderated": img.moderated,
                         "r_rated":   img.r_rated,
                         "model":     mid,
+                        "mode":      "agent",
                     })
         except grpc.RpcError as e:
             last_error = str(e.details())
@@ -841,13 +1030,16 @@ def generate_image(
         full_text = "".join(text_buf).lower()
         if not images and any(kw in full_text for kw in ["rate limit", "try again", "reached the", "limit"]):
             last_error = f"{mid}: image generation rate limited"
-            continue   # intentar con el siguiente imagine model
+            continue
 
-        return images  # éxito (puede ser lista vacía si la respuesta fue solo texto)
+        return images
 
+    reset_msg = f" Reset at: {next_reset}" if next_reset else ""
     raise RuntimeError(
-        f"Image generation rate limited on all {len(pool)} imagine models. "
-        f"Last error: {last_error}"
+        f"Image generation rate limited on all paths. "
+        f"fast_quota={quota['image']['remaining']}, "
+        f"quality_quota={quota['image_pro']['remaining']}."
+        f"{reset_msg} Last error: {last_error}"
     )
 
 
@@ -913,46 +1105,72 @@ def set_user_settings(exclude_from_training: Optional[bool] = None) -> dict:
 
 
 def list_modes(locale: str = "en-US") -> dict:
-    """Llama grok_api.Models/ListModes."""
-    ch   = get_channel()
-    stub = gg.ModelsStub(ch)
-    resp = stub.ListModes(
-        ga.ListModesRequest(locale=locale),
-        metadata=_make_meta(), timeout=10,
-    )
+    """Llama grok_api.Models/ListModes.
+    Mode (APK confirmed): f1=id, f2=title, f3=description, f4=badge_text, f6=icon_hint.
+    Stubs incorrectly mapped f4 as icon_url — it's actually badge_text.
+    """
+    raw   = _raw_unary("/grok_api.Models/ListModes", _str_field(1, locale), timeout=10)
+    outer = _decode_proto(raw)
+    modes = []
+    for kind, val in outer.get(1, []):
+        data  = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        inner = _decode_proto(data)
+        modes.append({
+            "mode_id":      _first_str(inner, 1),
+            "display_name": _first_str(inner, 2),
+            "description":  _first_str(inner, 3),
+            "badge_text":   _first_str(inner, 4) or None,
+            "icon_hint":    _first_str(inner, 6) or None,
+        })
     return {
-        "modes": [
-            {
-                "mode_id":      m.mode_id,
-                "display_name": m.display_name,
-                "description":  m.description,
-                "icon_url":     m.icon_url,
-            }
-            for m in resp.modes
-        ],
-        "default_mode_id": resp.default_mode_id,
+        "modes":           modes,
+        "default_mode_id": _first_str(outer, 2),
     }
 
 
 def list_voices() -> dict:
-    """Llama grok_api.Voice/ListTopVoices y ListVoices."""
-    ch   = get_channel()
-    stub = gg.VoiceStub(ch)
-    meta = _make_meta()
-    top = stub.ListTopVoices(ga.ListTopVoicesRequest(), metadata=meta, timeout=10)
-    all_ = stub.ListVoices(ga.ListVoicesRequest(), metadata=meta, timeout=10)
+    """Llama grok_api.Voice/ListTopVoices y ListVoices.
+
+    VoiceMetadata (APK confirmado): f1=voice_id, f2=name, f3=user_id, f4=gcs_path,
+      f5=duration_seconds(float), f6=sample_rate, f7=sha256_hash, f8-10=timestamps,
+      f11=visibility, f12=personality_preset_id, f13=personality_custom_prompt, f14=approved.
+    ListVoicesResponse: f1=repeated VoiceMetadata, f2=next_cursor.
+    ListTopVoicesResponse: f1=repeated TopVoiceEntry {f1=VoiceMetadata nested, f2=save_count}.
+
+    Los stubs compilados son incorrectos: mapean f2='display_name' y f3='description'
+    sobre VoiceMetadata cuando en realidad son name y user_id. Para ListTopVoices el
+    stub intenta leer VoiceMetadata (nested) como string, devolviendo basura.
+    """
+    def _parse_voice_meta(data: bytes) -> dict:
+        f = _decode_proto(data)
+        return {
+            "voice_id": _first_str(f, 1),
+            "name":     _first_str(f, 2),
+        }
+
+    raw_top = _raw_unary("/grok_api.Voice/ListTopVoices", b'', timeout=10)
+    raw_all = _raw_unary("/grok_api.Voice/ListVoices",    b'', timeout=10)
+
+    top_f = _decode_proto(raw_top)
+    all_f = _decode_proto(raw_all)
+
+    top_voices = []
+    for kind, val in top_f.get(1, []):  # repeated TopVoiceEntry
+        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        entry = _decode_proto(data)
+        for k2, v2 in entry.get(1, []):  # TopVoiceEntry.f1 = VoiceMetadata nested
+            meta_bytes = v2.encode('latin-1') if k2 == 'str' else (v2 if k2 == 'raw' else b'')
+            top_voices.append(_parse_voice_meta(meta_bytes))
+
+    voices = []
+    for kind, val in all_f.get(1, []):  # repeated VoiceMetadata
+        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        voices.append(_parse_voice_meta(data))
+
     return {
-        "top_voices": [
-            {"voice_id": v.voice_id, "display_name": v.display_name,
-             "description": v.description, "preview_url": v.preview_url}
-            for v in top.voices
-        ],
-        "voices": [
-            {"voice_id": v.voice_id, "display_name": v.display_name,
-             "description": v.description}
-            for v in all_.voices
-        ],
-        "next_cursor": all_.next_cursor or None,
+        "top_voices":  top_voices,
+        "voices":      voices,
+        "next_cursor": _first_str(all_f, 2) or None,
     }
 
 
@@ -1077,10 +1295,15 @@ def list_conversations(limit: int = 20, cursor: str = "") -> dict:
 
 
 def get_conversation(conv_id: str) -> dict:
-    """Llama grok_api.Chat/GetConversation."""
-    raw = _raw_unary("/grok_api.Chat/GetConversation", _str_field(1, conv_id))
-    f   = _decode_proto(raw)
-    return _parse_conversation(f)
+    """Llama grok_api.Chat/GetConversation.
+    GetConversationResponse: f1=conversation (Conversation nested), f2=share_link_path, f3=team_switch_prompt.
+    """
+    raw   = _raw_unary("/grok_api.Chat/GetConversation", _str_field(1, conv_id))
+    outer = _decode_proto(raw)
+    for kind, val in outer.get(1, []):
+        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        return _parse_conversation(_decode_proto(data))
+    return {}
 
 
 def delete_conversation(conv_id: str) -> dict:
@@ -1132,11 +1355,11 @@ def stream_add_response(
     Llama grok_api.Chat/AddResponse (streaming).
     Añade un mensaje a una conversación existente y retorna tokens limpios.
 
-    Proto AddResponseRequest (reverse-engineered):
+    Proto AddResponseRequest (confirmado vs APK jadx_out):
       f1 = conversation_id
       f2 = message (texto del usuario)
       f3 = model_name
-      f5 = new_human_message_id (UUID generado por el cliente)
+      f5 = parent_response_id (String, opcional — ID del response padre en la conversación)
       f8 = disable_search (bool)
     """
     mid = model_id or resolve_model(None)
