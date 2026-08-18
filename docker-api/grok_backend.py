@@ -164,16 +164,19 @@ def _varint(v: int) -> bytes:
 
 def _str_field(tag: int, s: str) -> bytes:
     b = s.encode()
-    return bytes([(tag << 3) | 2]) + _varint(len(b)) + b
+    return _varint((tag << 3) | 2) + _varint(len(b)) + b
+
+def _bytes_field(tag: int, b: bytes) -> bytes:
+    return _varint((tag << 3) | 2) + _varint(len(b)) + b
 
 def _bool_field(tag: int, v: bool) -> bytes:
-    return bytes([(tag << 3) | 0, 1 if v else 0])
+    return _varint((tag << 3) | 0) + _varint(1 if v else 0)
 
 def _int_field(tag: int, v: int) -> bytes:
-    return bytes([(tag << 3) | 0]) + _varint(v)
+    return _varint((tag << 3) | 0) + _varint(v)
 
 def _nested_field(tag: int, data: bytes) -> bytes:
-    return bytes([(tag << 3) | 2]) + _varint(len(data)) + data
+    return _varint((tag << 3) | 2) + _varint(len(data)) + data
 
 # Decoder genérico de campos protobuf (wire-level)
 def _decode_varint(data: bytes, i: int):
@@ -628,63 +631,58 @@ def _build_chat_request(
     system: Optional[str] = None,
     personality: Optional[str] = None,
     image_file_ids: Optional[list[str]] = None,
+    temporary: bool = False,
+    force_artifact: bool = False,
+    enabled_skills: Optional[list[int]] = None,
 ) -> bytes:
     """
     Construye CreateConversationAndRespondRequest como bytes proto raw.
-    Cuando hay image_file_ids usa raw encoding (f6=repeated string).
-    De lo contrario usa los stubs compilados para compatibilidad.
+
+    Campos confirmados:
+      f3  = temporary (bool)       — conversación efímera, no aparece en historial
+      f4  = model_name (string)
+      f5  = message (string)
+      f6  = file_attachments (repeated string) — IDs de imágenes subidas vía UploadFile
+      f8  = disable_search (bool)
+      f19 = custom_instructions (string) — system prompt nativo
+      f20 = custom_personality (string)
+      f32 = is_reasoning (bool)
+      f40 = do_force_trigger_artifact (bool) — fuerza generación de bloque de código
+      f74 = enabled_skills (repeated int32) — IDs de skill type: 1=docx,3=pdf,4=pptx,7=xlsx
     """
+    req = _str_field(4, model_id) + _str_field(5, prompt) + _bool_field(8, disable_search)
+    if temporary:
+        req += _bool_field(3, True)
+    if is_reasoning:
+        req += _bool_field(32, True)
+    if system:
+        req += _str_field(19, system)
+    if personality:
+        req += _str_field(20, personality)
     if image_file_ids:
-        req = (
-            _str_field(4, model_id)
-            + _str_field(5, prompt)
-            + _bool_field(8, disable_search)
-        )
-        if is_reasoning:
-            req += _bool_field(32, True)
-        if system:
-            req += _str_field(19, system)
-        if personality:
-            req += _str_field(20, personality)
         for fid in image_file_ids:
             req += _str_field(6, fid)
-        return req
-    else:
-        kwargs: dict = dict(
-            model_name=model_id,
-            message=prompt,
-            disable_search=disable_search,
-            is_reasoning=is_reasoning,
-        )
-        if system:
-            kwargs["custom_instructions"] = system
-        if personality:
-            kwargs["custom_personality"] = personality
-        return ga.CreateConversationAndRespondRequest(**kwargs).SerializeToString()
+    if force_artifact:
+        req += _bool_field(40, True)
+    if enabled_skills:
+        for skill_id in enabled_skills:
+            req += _int_field(74, skill_id)
+    return req
 
 
 def _stream_raw_chat(
     req_bytes: bytes,
     timeout: int = 120,
-    use_raw: bool = False,
 ):
     """Itera sobre chunks del stream CreateConversationAndRespond."""
     ch = get_channel()
-    if use_raw:
-        fn = ch.unary_stream(
-            "/grok_api.Chat/CreateConversationAndRespond",
-            request_serializer=lambda x: x,
-            response_deserializer=lambda x: x,
-        )
-        for raw in fn(req_bytes, metadata=_make_meta(), timeout=timeout):
-            yield raw, True   # (data, is_raw)
-    else:
-        stub = gg.ChatStub(ch)
-        req  = ga.CreateConversationAndRespondRequest.FromString(req_bytes)
-        for chunk in stub.CreateConversationAndRespond(
-            req, metadata=_make_meta(), timeout=timeout
-        ):
-            yield chunk, False
+    fn = ch.unary_stream(
+        "/grok_api.Chat/CreateConversationAndRespond",
+        request_serializer=lambda x: x,
+        response_deserializer=lambda x: x,
+    )
+    for raw in fn(req_bytes, metadata=_make_meta(), timeout=timeout):
+        yield raw
 
 
 def stream_chat(
@@ -696,58 +694,50 @@ def stream_chat(
     system: Optional[str] = None,
     personality: Optional[str] = None,
     image_file_ids: Optional[list[str]] = None,
+    temporary: bool = False,
+    force_artifact: bool = False,
+    enabled_skills: Optional[list[int]] = None,
 ) -> Iterator[str]:
     """
     Genera tokens limpios de texto. Rota modelo si RESOURCE_EXHAUSTED.
-    system         → custom_instructions (field 19, system prompt nativo)
-    personality    → custom_personality (field 20)
-    image_file_ids → IDs de imágenes previamente subidas (field 6, file_attachments)
+    system          → custom_instructions (f19, system prompt nativo)
+    personality     → custom_personality (f20)
+    image_file_ids  → IDs de imágenes subidas vía UploadFile (f6)
+    temporary       → conversación efímera, no aparece en historial (f3)
+    force_artifact  → fuerza bloque de código en la respuesta (f40)
+    enabled_skills  → lista de skill_type IDs a activar (f74): 1=docx,3=pdf,4=pptx,7=xlsx
     """
-    use_raw = bool(image_file_ids)
-
     for _ in range(len(HIGH_RATE_POOL) + 1):
         req_bytes = _build_chat_request(
             prompt, model_id, is_reasoning, disable_search,
             system, personality, image_file_ids,
+            temporary, force_artifact, enabled_skills,
         )
         cleaner = _StreamCleaner()
         try:
             conv_id: Optional[str] = None
-            for chunk, is_raw in _stream_raw_chat(req_bytes, timeout, use_raw):
-                if is_raw:
-                    f = _decode_proto(chunk)
-                    # conv_info en f2
-                    if conv_id is None:
-                        for kind, val in f.get(2, []):
-                            data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
-                            inner = _decode_proto(data)
-                            cid = _first_str(inner, 1)
-                            if cid: conv_id = cid
-                    # token en f1.f2
-                    for kind, val in f.get(1, []):
+            for chunk in _stream_raw_chat(req_bytes, timeout):
+                f = _decode_proto(chunk)
+                if conv_id is None:
+                    for kind, val in f.get(2, []):
                         data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
                         inner = _decode_proto(data)
-                        tok = _first_str(inner, 2)
-                        if tok:
-                            out = cleaner.feed(tok)
-                            if out:
-                                yield out
-                else:
-                    if conv_id is None:
-                        cinfo = chunk.conversation_info
-                        if cinfo and cinfo.conversation_id:
-                            conv_id = cinfo.conversation_id
-                    ar = chunk.add_response
-                    if ar.token:
-                        out = cleaner.feed(ar.token)
+                        cid = _first_str(inner, 1)
+                        if cid: conv_id = cid
+                for kind, val in f.get(1, []):
+                    data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+                    inner = _decode_proto(data)
+                    tok = _first_str(inner, 2)
+                    if tok:
+                        out = cleaner.feed(tok)
                         if out:
                             yield out
 
             tail = cleaner.flush()
             if tail:
                 yield tail
-            # Resolve generated files (plugin models)
-            if conv_id:
+            # Resolve generated files (plugin models) — no aplica para temporary
+            if conv_id and not temporary:
                 if cleaner.renders:
                     for _card_id, file_path in cleaner.renders:
                         url = _resolve_file_url(conv_id, file_path)
@@ -783,10 +773,14 @@ def complete_chat(
     system: Optional[str] = None,
     personality: Optional[str] = None,
     image_file_ids: Optional[list[str]] = None,
+    temporary: bool = False,
+    force_artifact: bool = False,
+    enabled_skills: Optional[list[int]] = None,
 ) -> str:
     return "".join(stream_chat(
         prompt, model_id, is_reasoning, disable_search,
         timeout, system, personality, image_file_ids,
+        temporary, force_artifact, enabled_skills,
     ))
 
 
@@ -899,6 +893,22 @@ def get_user_settings() -> dict:
         "allow_companion_notifications":    resp.allow_companion_notifications if resp.HasField("allow_companion_notifications") else None,
         "allow_auto_share":                 resp.allow_auto_share if resp.HasField("allow_auto_share") else None,
         "allow_grok_finished_notification": resp.allow_grok_finished_notification if resp.HasField("allow_grok_finished_notification") else None,
+    }
+
+
+def set_user_settings(exclude_from_training: Optional[bool] = None) -> dict:
+    """
+    Llama grok_api.Settings/SetUserSettings.
+    SetUserSettingsRequest: f1=exclude_from_training (bool directo, no nested).
+    Retorna el estado actual de los settings después del update.
+    """
+    req = b''
+    if exclude_from_training is not None:
+        req += _bool_field(1, exclude_from_training)
+    raw = _raw_unary("/grok_api.Settings/SetUserSettings", req, timeout=10)
+    f   = _decode_proto(raw)
+    return {
+        "exclude_from_training": bool(_first_int(f, 1)) if 1 in f else None,
     }
 
 
@@ -1205,7 +1215,7 @@ def upload_file(filename: str, content: Optional[bytes] = None,
     if mime_type:
         req += _str_field(2, mime_type)
     if content:
-        req += bytes([(3 << 3) | 2]) + _varint(len(content)) + content
+        req += _bytes_field(3, content)
     req += _bool_field(4, True)
 
     raw = _raw_unary("/grok_api.Chat/UploadFile", req, timeout=15)

@@ -78,9 +78,12 @@ class ChatRequest(BaseModel):
     presence_penalty:   Optional[float]  = None
     n:                  Optional[int]    = None
     seed:               Optional[int]    = None
-    # Extensiones propias
+    # Extensiones Grok nativas
     is_reasoning:       bool             = False
     disable_search:     bool             = True
+    temporary:          bool             = False   # f3: efímera, no queda en historial
+    force_artifact:     bool             = False   # f40: fuerza bloque de código
+    enabled_skills:     Optional[list[int]] = None # f74: IDs de skill [1=docx,3=pdf,4=pptx,7=xlsx]
 
 
 class LoginRequest(BaseModel):
@@ -265,6 +268,9 @@ async def chat_completions(req: ChatRequest):
                     disable_search=req.disable_search,
                     system=system,
                     image_file_ids=image_file_ids or None,
+                    temporary=req.temporary,
+                    force_artifact=req.force_artifact,
+                    enabled_skills=req.enabled_skills,
                 ):
                     full_text.append(token)
                     # Si hay tools, no emitir hasta el final (necesitamos parsear)
@@ -297,6 +303,9 @@ async def chat_completions(req: ChatRequest):
                 disable_search=req.disable_search,
                 system=system,
                 image_file_ids=image_file_ids or None,
+                temporary=req.temporary,
+                force_artifact=req.force_artifact,
+                enabled_skills=req.enabled_skills,
             )
         except Exception as e:
             raise HTTPException(status_code=502, detail=str(e))
@@ -375,6 +384,24 @@ def grok_settings():
     """Configuración del usuario en la cuenta de Grok."""
     try:
         return backend.get_user_settings()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+class SettingsUpdateRequest(BaseModel):
+    exclude_from_training: Optional[bool] = None
+
+
+@app.patch("/grok/settings", dependencies=[Depends(verify_key)])
+def grok_update_settings(req: SettingsUpdateRequest):
+    """
+    Actualiza la configuración del usuario.
+    Campos soportados:
+      exclude_from_training (bool) — si True, los chats no se usan para entrenar modelos.
+    Retorna el estado actual del setting después del update.
+    """
+    try:
+        return backend.set_user_settings(exclude_from_training=req.exclude_from_training)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
