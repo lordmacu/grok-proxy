@@ -178,6 +178,11 @@ def _int_field(tag: int, v: int) -> bytes:
 def _nested_field(tag: int, data: bytes) -> bytes:
     return _varint((tag << 3) | 2) + _varint(len(data)) + data
 
+def _packed_int_field(tag: int, values: list) -> bytes:
+    """Packed repeated INT32 (wire type 2). Proto3 default for repeated scalars."""
+    payload = b''.join(_varint(v) for v in values)
+    return _varint((tag << 3) | 2) + _varint(len(payload)) + payload
+
 # Decoder genérico de campos protobuf (wire-level)
 def _decode_varint(data: bytes, i: int):
     v = 0; shift = 0
@@ -665,8 +670,7 @@ def _build_chat_request(
     if force_artifact:
         req += _bool_field(40, True)
     if enabled_skills:
-        for skill_id in enabled_skills:
-            req += _int_field(74, skill_id)
+        req += _packed_int_field(74, enabled_skills)
     return req
 
 
