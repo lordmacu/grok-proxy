@@ -1,0 +1,436 @@
+syntax = "proto3";
+package grok_api;
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
+service Chat {
+  rpc CreateConversationAndRespond(CreateConversationAndRespondRequest)
+      returns (stream CreateConversationAndRespondResponseChunk);
+  rpc GetConversationStarters(EmptyRequest) returns (GetConversationStartersResponse);
+}
+
+// ── Models ───────────────────────────────────────────────────────────────────
+service Models {
+  rpc GetModels(EmptyRequest) returns (GetModelsResponse);
+  rpc ListModes(ListModesRequest) returns (ListModesResponse);
+  rpc GetModelsImagineOverrides(EmptyRequest) returns (GetModelsImagineOverridesResponse);
+}
+
+// ── Finance ──────────────────────────────────────────────────────────────────
+service Finance {
+  rpc FindStock(FindStockRequest) returns (FindStockResponse);
+  rpc GetStockSummary(GetStockTickerRequest) returns (GetStockSummaryResponse);
+  rpc GetStockMiniSummary(GetStockTickerRequest) returns (GetStockMiniSummaryResponse);
+  rpc GetStockChartData(GetStockChartDataRequest) returns (GetStockChartDataResponse);
+  rpc GetRelatedTickers(GetStockTickerRequest) returns (GetRelatedTickersResponse);
+  rpc GetStockFinancials(GetStockTickerRequest) returns (GetStockFinancialsResponse);
+}
+
+// ── RateLimits ───────────────────────────────────────────────────────────────
+service RateLimits {
+  rpc GetRateLimits(GetRateLimitsRequest) returns (GetRateLimitsResponse);
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+service Settings {
+  rpc GetUserSettings(EmptyRequest) returns (UserSettings);
+}
+
+// ── Skills ───────────────────────────────────────────────────────────────────
+service Skills {
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse);
+}
+
+// ── Voice ────────────────────────────────────────────────────────────────────
+service Voice {
+  rpc ListTopVoices(ListTopVoicesRequest) returns (ListTopVoicesResponse);
+  rpc ListVoices(ListVoicesRequest) returns (ListVoicesResponse);
+  rpc SearchVoices(SearchVoicesRequest) returns (SearchVoicesResponse);
+}
+
+// ── SuggestionService ────────────────────────────────────────────────────────
+service SuggestionService {
+  rpc StreamSuggestions(StreamSuggestionsRequest) returns (stream StreamSuggestionsResponse);
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Enums
+// ════════════════════════════════════════════════════════════════════════════
+
+enum RequestKind {
+  DEFAULT    = 0;
+  DEEPSEARCH = 1;
+  DEEPERSEARCH = 2;
+  REASONING  = 3;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Shared / utility messages
+// ════════════════════════════════════════════════════════════════════════════
+
+message EmptyRequest {}
+
+// Placeholder para tipos compuestos que recibimos pero no inspeccionamos
+message AnyData {}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Chat messages
+// ════════════════════════════════════════════════════════════════════════════
+
+message CreateConversationAndRespondRequest {
+  string model_name              = 4;
+  string message                 = 5;
+  bool   disable_search          = 8;
+  bool   enable_image_generation = 9;
+  bool   enable_image_streaming  = 12;
+  string custom_instructions     = 19;   // system prompt nativo
+  string custom_personality      = 20;   // personalidad del asistente
+  bool   is_reasoning            = 32;
+  string mode_id                 = 72;   // "fast" | "auto" (otros requieren SuperGrok)
+}
+
+message StreamingImageGenerationResponse {
+  string  image_url              = 1;
+  int32   progress               = 2;
+  int32   width                  = 3;
+  bool    moderated              = 4;
+  string  image_id               = 5;
+  int32   image_index            = 6;
+  string  asset_id               = 7;
+  string  image_model            = 8;
+  bool    r_rated                = 9;
+  int32   side_by_side_index     = 10;
+  bool    has_watermark          = 11;
+  bool    is_root_user_uploaded  = 13;
+}
+
+message RenderFilePreview {
+  string id               = 1;
+  string file_name        = 2;
+  string content_type     = 3;
+  string mime_type        = 4;
+  uint64 file_size        = 5;
+  string url              = 6;
+  string preview_data_url = 7;
+  string preview_doc_url  = 8;
+  string thumbnail_url    = 9;
+  string thumbnail_dark_url = 10;
+  string file_path        = 11;
+}
+
+message AddResponseResponse {
+  string                           token                               = 2;
+  StreamingImageGenerationResponse streaming_image_generation_response = 12;
+  RenderFilePreview                render_file_preview                 = 206;
+}
+
+message ConversationInfo {
+  string conversation_id = 1;
+  string title           = 2;
+}
+
+message GetFileContentRequest {
+  string conversation_id = 1;
+  string path            = 2;
+  string share_link_id   = 3;
+  bool   is_download     = 4;
+}
+
+message GetFileContentResponse {
+  string data_url          = 1;
+  string mime_type         = 2;
+  int64  size              = 3;
+  bool   is_truncated      = 4;
+  string signed_url        = 5;
+  string download_signed_url = 6;
+}
+
+message CreateConversationAndRespondResponseChunk {
+  oneof opt {
+    AddResponseResponse add_response = 1;
+  }
+  ConversationInfo conversation_info = 2;
+  string           response_id       = 20;
+}
+
+message GetConversationStartersResponse {
+  repeated string starters = 1;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Models messages
+// ════════════════════════════════════════════════════════════════════════════
+
+message GetModelsRequest {}
+
+message ModelDescription {
+  string name        = 1;
+  string description = 2;
+  string model_id    = 3;
+  repeated string tags = 4;
+  string badge_text  = 5;
+}
+
+message GetModelsResponse {
+  repeated ModelDescription models = 1;
+}
+
+message ListModesRequest {
+  string locale = 1;
+}
+
+message Mode {
+  string mode_id      = 1;
+  string display_name = 2;
+  string description  = 3;
+  string icon_url     = 4;
+}
+
+message ListModesResponse {
+  repeated Mode modes        = 1;
+  string        default_mode_id = 2;
+}
+
+message GetModelsImagineOverridesResponse {
+  repeated AnyData overrides = 1;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Finance messages
+// ════════════════════════════════════════════════════════════════════════════
+
+message FindStockRequest {
+  string ticker = 1;
+}
+
+message GetStockTickerRequest {
+  string ticker = 1;
+}
+
+// Generic chart data point
+message StockChartData {
+  double open   = 1;
+  double close  = 2;
+  double high   = 3;
+  double low    = 4;
+  double volume = 5;
+}
+
+message StockOverview {
+  string company_name  = 1;
+  string exchange      = 2;
+  string currency      = 3;
+  string sector        = 4;
+  string industry      = 5;
+}
+
+message FinancialValue {
+  double current       = 1;
+  double previous      = 2;
+  double change_pct    = 3;
+}
+
+message GetStockMiniSummaryResponse {
+  string        ticker        = 1;
+  StockOverview stock_overview = 2;
+  FinancialValue finance_value = 3;
+  StockChartData prev_day     = 4;
+  int64          timestamp    = 5;
+}
+
+message StockDividend {
+  double amount    = 1;
+  string frequency = 2;
+}
+
+message GetStockSummaryResponse {
+  string         ticker      = 1;
+  int64          timestamp   = 2;
+  double         market_cap  = 3;
+  StockChartData prev_day    = 4;
+  StockChartData current_day = 5;
+  StockDividend  dividend    = 6;
+  StockChartData one_year    = 7;
+}
+
+message FindStockResponse {
+  repeated GetStockMiniSummaryResponse stock_summaries = 1;
+}
+
+message GetStockChartDataRequest {
+  string ticker   = 1;
+  string timespan = 2;
+}
+
+message GetStockChartDataResponse {
+  string ticker = 1;
+  // map<int64, StockChartData> chart_data = 2;  -- omitido por limitaciones de proto3 map en testing
+  string unit   = 3;
+}
+
+message GetRelatedTickersResponse {
+  repeated string tickers = 1;
+}
+
+message GetStockFinancialsResponse {
+  repeated AnyData financials = 1;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// RateLimits messages
+// ════════════════════════════════════════════════════════════════════════════
+
+message GetRateLimitsRequest {
+  RequestKind request_kind = 1;
+  string      model_name  = 2;
+}
+
+message ModelEffortRateLimits {
+  int32 remaining_queries = 1;
+  int32 total_queries     = 2;
+}
+
+message GetRateLimitsResponse {
+  int32                  window_size_seconds     = 1;
+  int32                  remaining_queries       = 2;
+  optional int32         wait_time_seconds       = 3;
+  int32                  total_queries           = 4;
+  optional int32         remaining_tokens        = 5;
+  optional int32         total_tokens            = 6;
+  ModelEffortRateLimits  low_effort_rate_limits  = 7;
+  ModelEffortRateLimits  high_effort_rate_limits = 8;
+  optional uint32        pre_generation_delay_ms = 9;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Settings messages
+// ════════════════════════════════════════════════════════════════════════════
+
+message UserSettings {
+  optional bool exclude_from_training          = 1;
+  optional bool allow_x_personalization        = 3;
+  optional bool enable_memory                  = 4;
+  optional bool allow_share_indexing           = 5;
+  optional bool allow_companion_notifications  = 6;
+  optional bool allow_auto_share               = 7;
+  optional bool allow_grok_finished_notification = 10;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Skills messages
+// ════════════════════════════════════════════════════════════════════════════
+
+message ListSkillsRequest {
+  string locale = 1;
+}
+
+message Skill {
+  string skill_id     = 1;
+  string display_name = 2;
+  string description  = 3;
+  string icon_url     = 4;
+}
+
+message ListSkillsResponse {
+  repeated Skill skills = 1;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Voice messages
+// ════════════════════════════════════════════════════════════════════════════
+
+message ListTopVoicesRequest {
+  optional int32 limit = 1;
+}
+
+message TopVoiceEntry {
+  string voice_id     = 1;
+  string display_name = 2;
+  string description  = 3;
+  string preview_url  = 4;
+}
+
+message ListTopVoicesResponse {
+  repeated TopVoiceEntry voices = 1;
+}
+
+message ListVoicesRequest {
+  optional int32 limit  = 1;
+  optional string cursor = 2;
+}
+
+message VoiceMetadata {
+  string voice_id     = 1;
+  string display_name = 2;
+  string description  = 3;
+}
+
+message ListVoicesResponse {
+  repeated VoiceMetadata voices = 1;
+  string                 next_cursor = 2;
+}
+
+message SearchVoicesRequest {
+  string query = 1;
+}
+
+message SearchVoicesResponse {
+  repeated VoiceMetadata voices = 1;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// SuggestionService messages
+// ════════════════════════════════════════════════════════════════════════════
+
+enum SuggestionType {
+  SUGGESTION_TYPE_UNSPECIFIED       = 0;
+  SUGGESTION_TYPE_SEARCH_COMPLETION = 1;
+  SUGGESTION_TYPE_QUICK_ANSWER      = 2;
+  SUGGESTION_TYPE_STOCK             = 3;
+  SUGGESTION_TYPE_GROK_COMPLETION   = 4;
+}
+
+message AcceptedSuggestionType {
+  SuggestionType type      = 1;
+  int32          max_items = 2;
+}
+
+message StreamSuggestionsRequest {
+  string                      query          = 1;
+  repeated AcceptedSuggestionType accepted_types = 2;
+}
+
+message StockSuggestion {
+  string ticker = 1;
+  string name   = 2;
+}
+
+message SearchCompletionSuggestion {
+  string text = 1;
+}
+
+message QuickAnswerSuggestion {
+  string text = 1;
+}
+
+message GrokCompletionSuggestion {
+  string text = 1;
+}
+
+message StreamSuggestionsResponse {
+  oneof suggestion {
+    SearchCompletionSuggestion search_completion = 1;
+    StockSuggestion            stock             = 2;
+    QuickAnswerSuggestion      quick_answer      = 3;
+    GrokCompletionSuggestion   grok_completion   = 4;
+  }
+}

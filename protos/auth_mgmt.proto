@@ -1,0 +1,148 @@
+syntax = "proto3";
+package auth_mgmt;
+
+service AuthManagement {
+  rpc CreateEmailValidationCode(CreateEmailValidationCodeRequest) returns (EmptyResponse);
+  rpc VerifyEmailValidationCode(VerifyEmailValidationCodeRequest) returns (EmptyResponse);
+  rpc ResetPasswordByEmailValidationCode(ResetPasswordByEmailValidationCodeRequest)
+      returns (ResetPasswordByEmailValidationCodeResponse);
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  rpc CreateSessionV2(CreateSessionRequest) returns (CreateSessionV2Response);
+  rpc GetAuthUrl(GetAuthUrlRequest) returns (GetAuthUrlResponse);
+}
+
+message EmptyResponse {}
+
+// ── OTP email ──────────────────────────────────────────────────────────────────
+
+enum EmailTemplate {
+  SIGN_UP        = 0;
+  UPDATE_EMAIL   = 1;
+  RESET_PASSWORD = 2;
+}
+
+message CreateEmailValidationCodeRequest {
+  string        email          = 1;
+  EmailTemplate email_template = 2;
+}
+
+message VerifyEmailValidationCodeRequest {
+  string email                = 1;
+  string email_validation_code = 2;
+}
+
+message ResetPasswordByEmailValidationCodeRequest {
+  string email_validation_code = 1;
+  string clear_text_password   = 2;
+  string email                 = 3;
+  int32  num_one_time_links    = 4;
+}
+
+// ── prod_auth.Session (parcial — solo los campos que usamos) ──────────────────
+
+message ProdAuthSession {
+  string session_id = 1;
+  string user_id    = 2;
+}
+
+// ── CreateSessionResponse (auth_mgmt) ─────────────────────────────────────────
+
+message CreateSessionResponse {
+  ProdAuthSession session              = 1;
+  string          session_cookie       = 2;
+  repeated string one_time_link_tokens = 3;
+  bool            is_new_user          = 4;
+}
+
+message ResetPasswordByEmailValidationCodeResponse {
+  CreateSessionResponse session_response = 1;
+}
+
+// ── CreateSession / CreateSessionV2 ───────────────────────────────────────────
+
+message CreateSessionRequest {
+  Credentials credentials              = 1;
+  AntiAbuseToken anti_abuse_token      = 4;
+  int32          num_one_time_links    = 5;
+  int32          tos_version           = 6;
+  string         tesla_request_id      = 8;
+  bool           prompt_on_duplicate_email = 9;
+  string         castle_request_token  = 10;
+
+  message Credentials {
+    oneof credentials {
+      EmailAndPasswordRequest email_and_password    = 1;
+      OAuth2Response          oauth                 = 2;
+      OAuthDataToken          oauth_data_token      = 5;
+      IdentityTokenResponse   identity_token_response = 4;
+    }
+  }
+
+  message EmailAndPasswordRequest {
+    string email               = 1;
+    string clear_text_password = 2;
+  }
+
+  message OAuth2Response {
+    string code          = 2;
+    string state         = 3;
+    string oauth2_cookie = 4;
+  }
+
+  message OAuthDataToken {
+    string token = 1;
+  }
+
+  // Google Sign-In (GOOGLE_ANDROID): identity_token = Google ID JWT, sin castle
+  message IdentityTokenResponse {
+    OAuth2Provider provider       = 1;
+    string         identity_token = 2;
+    string         given_name     = 4;
+    string         family_name    = 5;
+    string         state          = 7;
+    string         oauth2_cookie  = 8;
+  }
+}
+
+enum OAuth2Provider {
+  X              = 0;
+  GOOGLE         = 1;
+  MICROSOFT      = 2;
+  X_IOS          = 3;
+  APPLE_IOS      = 4;
+  GOOGLE_IOS     = 5;
+  X_ANDROID      = 6;
+  GOOGLE_ANDROID = 7;
+}
+
+message GetAuthUrlRequest {
+  OAuth2Provider provider        = 1;
+  string         redirect_url    = 2;
+  AntiAbuseToken anti_abuse_token = 3;
+  // tag 4 = state_metadata (map, omitido)
+  string         client_id       = 5;
+  string         scope           = 6;
+}
+
+message GetAuthUrlResponse {
+  string auth_url      = 1;
+  string oauth2_cookie = 2;
+}
+
+message AntiAbuseToken {
+  string token = 1;
+}
+
+// ── CreateSessionV2Response ───────────────────────────────────────────────────
+
+message ExistingEmailSignInMethods {
+  repeated int32 sign_in_methods = 1;  // prod_auth.SignInMethod enum
+  string oauth_data_token        = 2;
+}
+
+message CreateSessionV2Response {
+  oneof response {
+    CreateSessionResponse       session                      = 1;
+    ExistingEmailSignInMethods  existing_email_sign_in_methods = 2;
+  }
+}

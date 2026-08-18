@@ -1,0 +1,60 @@
+syntax = "proto3";
+package auth_frontend;
+
+service AuthFrontend {
+  rpc CreateAnonUser(CreateAnonUserRequest) returns (CreateAnonUserResponse);
+  rpc CreateAnonUserChallenge(CreateChallengeRequest) returns (CreateChallengeResponse);
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  rpc GetAuthStatus(EmptyMessage) returns (EmptyMessage);
+}
+
+// ── Anon ──────────────────────────────────────────────────────────────────────
+
+message EmptyMessage {}
+
+message CreateAnonUserRequest {
+  bytes user_public_key = 1;
+}
+
+message CreateAnonUserResponse {
+  string anon_user_id = 1;
+}
+
+message CreateChallengeRequest {
+  string anon_user_id = 1;
+}
+
+message CreateChallengeResponse {
+  bytes challenge = 1;
+}
+
+// ── Session / Login ───────────────────────────────────────────────────────────
+
+// Mapeado a auth_mgmt.CreateSessionRequest
+// credentials usa el mismo wire format que auth_mgmt.CreateSessionRequest.Credentials
+message CreateSessionRequest {
+  Credentials credentials               = 1;
+  string      session_id                = 7;
+  bool        prompt_on_duplicate_email = 8;
+  string      castle_request_token      = 10;
+
+  message Credentials {
+    oneof credentials {
+      EmailAndPassword email_and_password = 1;
+      // OAuth2Response oauth              = 2;  // X / Google / Apple
+    }
+  }
+
+  message EmailAndPassword {
+    string email             = 1;
+    string clear_text_password = 2;
+  }
+}
+
+// Mapeado a auth_mgmt.CreateSessionResponse
+message CreateSessionResponse {
+  // session = 1 es un prod_auth.Session complejo, lo ignoramos
+  string          session_cookie       = 2;   // → Cookie: sso=<token>; sso-rw=<token>
+  repeated string one_time_link_tokens = 3;
+  bool            is_new_user          = 4;
+}

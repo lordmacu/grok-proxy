@@ -1,0 +1,24 @@
+# APK y artefactos de decompilación (grandes, no van al repo)
+*.apkm
+*.xapk
+apkm_extracted/
+jadx_out/
+
+# Credenciales y sesiones
+.env
+docker-api/.env
+.session.json
+.anon_creds.json
+.oauth_state.json
+*.token
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+cache/
+
+# macOS
+.DS_Store

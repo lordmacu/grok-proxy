@@ -1,0 +1,1072 @@
+openapi: "3.1.0"
+info:
+  title: Grok OpenAI Proxy
+  version: "1.0.0"
+  description: |
+    Proxy OpenAI-compatible sobre Grok gRPC (`grok.com:443`).
+
+    Expone dos grupos de endpoints:
+    - **OpenAI-compatible** (`/v1/*`) — drop-in replacement para clientes OpenAI.
+    - **Grok-native** (`/grok/*`) — acceso directo a servicios gRPC de Grok:
+      conversaciones, mensajes, share, skills, rate limits, settings, voices, suggestions.
+    - **Auth** (`/auth/*`) — OTP y login con contraseña.
+
+servers:
+  - url: http://localhost:8000
+    description: Local Docker
+
+# ── Security ──────────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        API key configurado en `API_KEY` env var.
+        Si `API_KEY` está vacío, todos los endpoints son públicos.
+
+  schemas:
+
+    # ── Chat ──────────────────────────────────────────────────────────────────
+    Message:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+        content:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+        name:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolCall"
+        tool_call_id:
+          type: string
+
+    ToolCall:
+      type: object
+      properties:
+        id:   { type: string }
+        type: { type: string, enum: [function] }
+        function:
+          type: object
+          properties:
+            name:      { type: string }
+            arguments: { type: string, description: "JSON-encoded args" }
+
+    ChatRequest:
+      type: object
+      required: [messages]
+      properties:
+        model:
+          type: string
+          default: grok-4.5
+          description: |
+            Modelo interno o alias.
+            Aliases: `auto`, `grok-4.5`, `grok`, `gpt-4o`, `gpt-4`,
+            `gpt-4-turbo`, `gpt-3.5-turbo`, `claude-3-opus`, `claude-3-sonnet` →
+            todos rotan sobre el HIGH_RATE_POOL (17 × 999/h).
+            `grok-3` → directo (30 req/24h).
+            Modelos internos directos: `grok-plugins-4p6-excel`, etc.
+          example: auto
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        stream:
+          type: boolean
+          default: false
+          description: Si true, la respuesta es SSE (`text/event-stream`).
+        tools:
+          type: array
+          description: |
+            OpenAI tool definitions. Se inyectan como contexto de sistema y se
+            parsean del texto de respuesta. No hay soporte nativo de tool-calling
+            en el gRPC de Grok — el proxy lo emula.
+          items:
+            type: object
+        tool_choice:
+          description: Ignorado (el proxy detecta tool calls automáticamente).
+        # Grok-native extensions
+        is_reasoning:
+          type: boolean
+          default: false
+          description: Activa el modo razonamiento (solo modelos con thinking).
+        disable_search:
+          type: boolean
+          default: true
+          description: Deshabilita la búsqueda web de Grok (default true en el proxy).
+        # OpenAI params accepted but no effect
+        temperature:    { type: number }
+        top_p:          { type: number }
+        max_tokens:     { type: integer }
+        stop:           {}
+        frequency_penalty: { type: number }
+        presence_penalty:  { type: number }
+        n:              { type: integer }
+        seed:           { type: integer }
+
+    ChatCompletionChunk:
+      type: object
+      description: Chunk SSE (stream=true). Formato `data: <json>\n\n`. Termina con `data: [DONE]\n\n`.
+      properties:
+        id:      { type: string }
+        object:  { type: string, enum: [chat.completion.chunk] }
+        created: { type: integer }
+        model:   { type: string }
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:  { type: integer }
+              delta:
+                type: object
+                properties:
+                  role:    { type: string }
+                  content: { type: string }
+                  tool_calls:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ToolCall"
+              finish_reason: { type: string, nullable: true }
+
+    ChatCompletion:
+      type: object
+      description: Respuesta completa (stream=false).
+      properties:
+        id:      { type: string }
+        object:  { type: string, enum: [chat.completion] }
+        created: { type: integer }
+        model:   { type: string }
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:  { type: integer }
+              message:
+                type: object
+                properties:
+                  role:       { type: string }
+                  content:    { type: string, nullable: true }
+                  tool_calls:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ToolCall"
+              finish_reason: { type: string }
+        usage:
+          type: object
+          properties:
+            prompt_tokens:     { type: integer }
+            completion_tokens: { type: integer }
+            total_tokens:      { type: integer }
+
+    # ── Images ────────────────────────────────────────────────────────────────
+    ImageRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+          example: "a futuristic city at night, cyberpunk style"
+        n:
+          type: integer
+          minimum: 1
+          maximum: 4
+          default: 1
+          description: Número de imágenes (n > 1 se envía como prompt compuesto).
+        size:
+          type: string
+          default: "1024x1024"
+          description: Ignorado — Grok decide el tamaño.
+        model:
+          type: string
+          nullable: true
+          description: |
+            Uno de: `imagine-agent-mode`, `imagine-agent-mode-dev`,
+            `imagine-agent-mode-grok-4-5`. Si es null o "auto", rota entre los tres.
+        quality: { type: string, default: standard, description: Ignorado. }
+        style:   { type: string, default: vivid,    description: Ignorado. }
+
+    ImageResponse:
+      type: object
+      properties:
+        created: { type: integer }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              url:      { type: string, format: uri }
+              image_id: { type: string }
+              asset_id: { type: string }
+              model:    { type: string }
+
+    # ── Models ────────────────────────────────────────────────────────────────
+    ModelObject:
+      type: object
+      properties:
+        id:            { type: string }
+        object:        { type: string, enum: [model] }
+        created:       { type: integer }
+        owned_by:      { type: string }
+        rate_per_hour: { type: integer, nullable: true }
+        window_hours:  { type: integer, nullable: true }
+        notes:         { type: string }
+
+    # ── Auth ──────────────────────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:    { type: string, format: email }
+        password: { type: string, format: password }
+
+    OtpSendRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+
+    OtpVerifyRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email: { type: string, format: email }
+        code:
+          type: string
+          description: "Código de 6 dígitos (con o sin guión: '938612' o '938-612')"
+          example: "938612"
+
+    SessionTokenResponse:
+      type: object
+      properties:
+        session_token: { type: string }
+        hint: { type: string }
+
+    # ── Grok native ───────────────────────────────────────────────────────────
+    Skill:
+      type: object
+      properties:
+        skill_id:     { type: string }
+        display_name: { type: string }
+        description:  { type: string }
+        icon_url:     { type: string, format: uri }
+
+    RateLimitEntry:
+      type: object
+      properties:
+        model:          { type: string }
+        notes:          { type: string }
+        rate_per_hour:  { type: integer }
+        window_hours:   { type: integer }
+        remaining:      { type: integer, nullable: true }
+        total:          { type: integer, nullable: true }
+        window_seconds: { type: integer, nullable: true }
+
+    Voice:
+      type: object
+      properties:
+        voice_id:     { type: string }
+        display_name: { type: string }
+        description:  { type: string }
+        preview_url:  { type: string, format: uri, nullable: true }
+
+    UserSettings:
+      type: object
+      properties:
+        exclude_from_training:           { type: boolean, nullable: true }
+        allow_x_personalization:         { type: boolean, nullable: true }
+        enable_memory:                   { type: boolean, nullable: true }
+        allow_share_indexing:            { type: boolean, nullable: true }
+        allow_companion_notifications:   { type: boolean, nullable: true }
+        allow_auto_share:                { type: boolean, nullable: true }
+        allow_grok_finished_notification:{ type: boolean, nullable: true }
+
+    Mode:
+      type: object
+      properties:
+        mode_id:      { type: string }
+        display_name: { type: string }
+        description:  { type: string }
+        icon_url:     { type: string, format: uri, nullable: true }
+
+    # ── Conversations ─────────────────────────────────────────────────────────
+    Conversation:
+      type: object
+      properties:
+        conversation_id: { type: string, format: uuid }
+        title:           { type: string }
+        created_at:      { type: string, format: date-time, nullable: true }
+        updated_at:      { type: string, format: date-time, nullable: true }
+
+    ConversationMessage:
+      type: object
+      description: Mensaje almacenado en una conversación de Grok (response-level).
+      properties:
+        response_id: { type: string, format: uuid, description: "UUID único del mensaje en Grok" }
+        text:        { type: string, description: "Contenido del mensaje" }
+        role:        { type: string, enum: [human, assistant, unknown] }
+        parent_id:   { type: string, format: uuid, nullable: true, description: "ID del mensaje padre" }
+        model:       { type: string, nullable: true, description: "Modelo que generó la respuesta" }
+
+    AddResponseRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: Texto del mensaje del usuario a añadir.
+          example: "¿Cuánto es 2 + 2?"
+        model:
+          type: string
+          nullable: true
+          description: Modelo a usar. Si es null rota round-robin entre HIGH_RATE_POOL.
+          example: imagine-agent-mode
+        stream:
+          type: boolean
+          default: false
+          description: Si true, la respuesta es SSE igual que /v1/chat/completions.
+        disable_search:
+          type: boolean
+          default: true
+
+    ShareConversationResponse:
+      type: object
+      properties:
+        share_token:
+          type: string
+          description: "Token opaco de share. Formato: base64('shard-N')_<uuid>"
+          example: "c2hhcmQtNQ_752db55f-57b3-435a-ace9-be82a10edbe9"
+        share_url:
+          type: string
+          format: uri
+          example: "https://grok.com/share/c2hhcmQtNQ_752db55f-57b3-435a-ace9-be82a10edbe9"
+
+    Error:
+      type: object
+      properties:
+        detail: { type: string }
+
+security:
+  - BearerAuth: []
+  - {}            # sin auth si API_KEY está vacío
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+paths:
+
+  # ── Health ────────────────────────────────────────────────────────────────
+  /health:
+    get:
+      tags: [Status]
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:               { type: string, example: ok }
+                  version:              { type: string, example: "1.0.0" }
+                  session_configured:   { type: boolean }
+                  high_rate_pool_size:  { type: integer }
+
+  # ── OpenAI-compatible ─────────────────────────────────────────────────────
+  /v1/models:
+    get:
+      tags: [OpenAI]
+      summary: List models
+      description: Devuelve todos los modelos disponibles — aliases y modelos internos con sus límites de rate.
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: { type: string, enum: [list] }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ModelObject"
+
+  /v1/models/rates:
+    get:
+      tags: [OpenAI, Grok]
+      summary: Live rate limits
+      description: Consulta los rate limits actuales en tiempo real directamente en Grok gRPC.
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RateLimitEntry"
+                  pool_current:
+                    type: string
+                    description: Modelo actualmente activo en el rotador
+
+  /v1/models/{model_id}:
+    get:
+      tags: [OpenAI]
+      summary: Get model
+      parameters:
+        - name: model_id
+          in: path
+          required: true
+          schema: { type: string }
+          example: grok-plugins-4p6-excel
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelObject"
+        "404":
+          description: Model not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/chat/completions:
+    post:
+      tags: [OpenAI]
+      summary: Chat completions
+      description: |
+        Endpoint principal de chat. Drop-in compatible con `openai.ChatCompletion.create()`.
+
+        **Detalles Grok:**
+        - Los mensajes `system` se envían como `custom_instructions` (campo proto 19), no como texto prepend.
+        - `is_reasoning: true` activa el modo razonamiento (modelos que lo soporten).
+        - `disable_search: true` (default) desactiva la búsqueda web.
+        - Plugin models (`grok-plugins-4p6-excel`, etc.) generan archivos; cuando
+          terminan, el proxy appenda `[Descargar: **nombre.xlsx**](url_gcs)` al final
+          del texto. La URL es una GCS signed URL válida por 1 hora.
+        - `temperature`, `top_p`, `max_tokens`, `stop`, etc. son aceptados pero
+          **no tienen efecto** — Grok gRPC no los soporta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+            examples:
+              simple:
+                summary: Pregunta simple (sin streaming)
+                value:
+                  model: auto
+                  messages:
+                    - role: user
+                      content: "¿Cuánto es 2+2?"
+              streaming:
+                summary: Streaming SSE
+                value:
+                  model: grok-4.5
+                  stream: true
+                  messages:
+                    - role: system
+                      content: "Eres un asistente conciso."
+                    - role: user
+                      content: "Explica la relatividad en 2 oraciones."
+              excel_file:
+                summary: Generar archivo Excel
+                value:
+                  model: grok-plugins-4p6-excel
+                  messages:
+                    - role: user
+                      content: "Crea un Excel con los 5 planetas más grandes del sistema solar con columnas: Planeta, Diámetro (km), Lunas."
+              with_tools:
+                summary: Tool calling
+                value:
+                  model: auto
+                  messages:
+                    - role: user
+                      content: "¿Cuál es el clima en Bogotá?"
+                  tools:
+                    - type: function
+                      function:
+                        name: get_weather
+                        description: Get current weather
+                        parameters:
+                          type: object
+                          properties:
+                            location: { type: string }
+                          required: [location]
+      responses:
+        "200":
+          description: |
+            Si `stream=false`: JSON completo.
+            Si `stream=true`: SSE (`text/event-stream`), chunks terminan con `data: [DONE]`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletion"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionChunk"
+        "502":
+          description: Error del backend Grok gRPC
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/images/generations:
+    post:
+      tags: [OpenAI]
+      summary: Image generation (Aurora)
+      description: |
+        Genera imágenes con Aurora (Grok Imagine). Rota automáticamente entre los 3
+        modelos `imagine-agent-mode*`. Tiene rate limit propio (más estricto que los
+        999/h de chat). Cuando todos los modelos están agotados retorna 429.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageRequest"
+            example:
+              prompt: "a red sports car on a mountain road at sunset, photorealistic"
+              n: 1
+      responses:
+        "200":
+          description: URLs de imágenes generadas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageResponse"
+        "429":
+          description: Aurora rate limited en todos los modelos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: No se generaron imágenes (cuenta sin acceso a Aurora)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ── Grok-native ───────────────────────────────────────────────────────────
+  /grok/skills:
+    get:
+      tags: [Grok]
+      summary: List skills
+      description: |
+        Llama `grok_api.Skills/ListSkills` y devuelve los skills disponibles.
+        Los skills son capacidades de plugin (`xlsx`, `docx`, `pptx`, `pdf`, `skill-creator`).
+        La forma más fácil de usar un skill es elegir el plugin model correspondiente
+        en `/v1/chat/completions` (`grok-plugins-4p6-excel`, etc.).
+      parameters:
+        - name: locale
+          in: query
+          schema: { type: string, default: "en-US" }
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  skills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Skill"
+
+  /grok/settings:
+    get:
+      tags: [Grok]
+      summary: User settings
+      description: Llama `grok_api.Settings/GetUserSettings` y devuelve la configuración de la cuenta.
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+
+  /grok/modes:
+    get:
+      tags: [Grok]
+      summary: List modes
+      description: |
+        Llama `grok_api.Models/ListModes`. Devuelve los modos disponibles (`fast`, `auto`,
+        `expert`, `heavy`, `build`) y el modo por defecto.
+        Los modos `expert`, `heavy` y `build` requieren SuperGrok — devuelven
+        `PERMISSION_DENIED` en cuentas gratuitas.
+      parameters:
+        - name: locale
+          in: query
+          schema: { type: string, default: "en-US" }
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Mode"
+                  default_mode_id:
+                    type: string
+                    example: fast
+
+  /grok/voices:
+    get:
+      tags: [Grok]
+      summary: List voices
+      description: |
+        Llama `grok_api.Voice/ListTopVoices` y `ListVoices`.
+        Actualmente retorna lista vacía en cuentas gratuitas — las voces son una
+        feature premium.
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  top_voices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Voice"
+                  voices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Voice"
+
+  /grok/rate-limits/{model_id}:
+    get:
+      tags: [Grok]
+      summary: Rate limits for a specific model
+      description: Llama `grok_api.RateLimits/GetRateLimits` para un modelo específico.
+      parameters:
+        - name: model_id
+          in: path
+          required: true
+          schema: { type: string }
+          example: grok-plugins-4p6-excel
+        - name: kind
+          in: query
+          description: "0=DEFAULT, 1=DEEPSEARCH, 2=DEEPERSEARCH, 3=REASONING"
+          schema: { type: integer, enum: [0, 1, 2, 3], default: 0 }
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitEntry"
+
+  # ── Conversations ─────────────────────────────────────────────────────────
+  /grok/conversations:
+    get:
+      tags: [Grok]
+      summary: List conversations
+      description: |
+        Lista las conversaciones del usuario vía `grok_api.Chat/ListConversations`.
+        Soporta paginación con cursor.
+
+        **Proto request**: `f1=page_size(int), f2=page_token(str)`.
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+          description: Número máximo de conversaciones por página.
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: Token de paginación de la respuesta anterior (campo `next_cursor`).
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Conversation"
+                  next_cursor:
+                    type: string
+                    nullable: true
+                    description: Cursor para la siguiente página (null si no hay más).
+
+  /grok/conversations/{conv_id}:
+    get:
+      tags: [Grok]
+      summary: Get conversation metadata
+      description: Llama `grok_api.Chat/GetConversation`. Devuelve título y fechas.
+      parameters:
+        - name: conv_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "502":
+          description: Conversación no encontrada o error de red
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      tags: [Grok]
+      summary: Rename conversation
+      description: Llama `grok_api.Chat/UpdateConversation`. Cambia el título de la conversación.
+      parameters:
+        - name: conv_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  example: "Mi conversación sobre imágenes"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+
+    delete:
+      tags: [Grok]
+      summary: Delete conversation
+      description: |
+        Llama `grok_api.Chat/DeleteConversation`.
+        **Irreversible** — elimina la conversación y todos sus mensajes.
+      parameters:
+        - name: conv_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:         { type: boolean }
+                  conversation_id: { type: string, format: uuid }
+
+  /grok/conversations/{conv_id}/messages:
+    get:
+      tags: [Grok]
+      summary: List messages
+      description: |
+        Llama `grok_api.Chat/ListResponses` (descubierto en la exploración gRPC).
+        Devuelve el historial completo de la conversación: mensajes humanos y del
+        asistente con su `response_id` (UUID interno de Grok), rol, texto, padre y modelo.
+
+        El `response_id` de la última respuesta del asistente es necesario para
+        `POST /grok/conversations/{id}/share`.
+      parameters:
+        - name: conv_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversation_id: { type: string, format: uuid }
+                  count:           { type: integer }
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ConversationMessage"
+
+    post:
+      tags: [Grok]
+      summary: Add message & get response
+      description: |
+        Llama `grok_api.Chat/AddResponse` (streaming gRPC).
+        Añade un mensaje a una conversación existente y devuelve la respuesta del
+        asistente. Soporta streaming SSE igual que `/v1/chat/completions`.
+
+        **Proto AddResponseRequest** (reverse-engineered):
+        | Campo | Tag | Tipo   | Descripción                              |
+        |-------|-----|--------|------------------------------------------|
+        | conversation_id  | f1 | string | UUID de la conversación       |
+        | message          | f2 | string | Texto del mensaje del usuario |
+        | model_name       | f3 | string | Modelo a usar                 |
+        | new_msg_uuid     | f5 | string | UUID generado por el cliente  |
+        | disable_search   | f8 | bool   | Deshabilitar búsqueda web     |
+        | enable_image_gen | f9 | bool   | Habilitar generación de imagen|
+
+        El campo `f5` (new_msg_uuid) es pre-asignado por el cliente como ID del
+        nuevo mensaje humano — el servidor lo almacena como el `response_id` del
+        mensaje.
+      parameters:
+        - name: conv_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddResponseRequest"
+            examples:
+              simple:
+                summary: Mensaje simple (no-streaming)
+                value:
+                  message: "¿Cuánto es 2 + 2?"
+              streaming:
+                summary: Respuesta con SSE
+                value:
+                  message: "Explícame la relatividad en 3 frases"
+                  stream: true
+                  model: imagine-agent-mode
+      responses:
+        "200":
+          description: Respuesta del asistente (igual que `/v1/chat/completions`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletion"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionChunk"
+        "502":
+          description: Error gRPC
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /grok/conversations/{conv_id}/share:
+    post:
+      tags: [Grok]
+      summary: Share conversation
+      description: |
+        Llama `grok_api.Chat/ShareConversation`.
+        Genera un link de compartir para una conversación.
+
+        **Comportamiento**: si `resp_id` no se proporciona, el proxy llama primero
+        a `ListResponses` para obtener el ID de la última respuesta del asistente.
+
+        **Proto ShareConversationRequest**:
+        - `f1` = conversation_id
+        - `f2` = response_id (última respuesta del asistente)
+        - `f5` = share_publicly (bool)
+
+        **Share token format**: `base64('shard-N')_<share-uuid>`
+        La URL resultante es `https://grok.com/share/<token>`.
+      parameters:
+        - name: conv_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: resp_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: Response ID a compartir. Si se omite, se usa la última respuesta.
+        - name: share_publicly
+          in: query
+          schema: { type: boolean, default: true }
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareConversationResponse"
+        "502":
+          description: Sin respuestas en la conversación o error gRPC
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /grok/suggest:
+    get:
+      tags: [Grok]
+      summary: Stream suggestions
+      description: |
+        Llama `grok_api.SuggestionService/StreamSuggestions`.
+        Retorna completions de búsqueda, respuestas rápidas, stocks, y completions de Grok
+        para un query de texto. En cuentas gratuitas puede devolver lista vacía.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+          example: "elon musk"
+        - name: types
+          in: query
+          description: "Tipos a incluir: search_completion, quick_answer, stock, grok_completion"
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [search_completion, quick_answer, stock, grok_completion]
+          style: form
+          explode: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [search_completion, quick_answer, stock, grok_completion]
+                        text:   { type: string, nullable: true }
+                        ticker: { type: string, nullable: true }
+                        name:   { type: string, nullable: true }
+
+  # ── Auth ──────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login con email y contraseña
+      description: |
+        Para cuentas con contraseña nativa (no OAuth). Devuelve un `session_token`
+        para usarlo como `GROK_SESSION_TOKEN`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionTokenResponse"
+        "401":
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/otp/send:
+    post:
+      tags: [Auth]
+      summary: Enviar OTP
+      description: Envía un código OTP al email. Para cuentas creadas con Google/Twitter OAuth.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpSendRequest"
+      responses:
+        "200":
+          description: OTP enviado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:      { type: boolean }
+                  message: { type: string }
+        "400":
+          description: Error al enviar OTP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/otp/verify:
+    post:
+      tags: [Auth]
+      summary: Verificar OTP → session_token
+      description: Verifica el código OTP y devuelve el `session_token`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerifyRequest"
+            example:
+              email: "user@gmail.com"
+              code: "938612"
+      responses:
+        "200":
+          description: Token de sesión
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionTokenResponse"
+        "400":
+          description: Código inválido o expirado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+tags:
+  - name: OpenAI
+    description: Endpoints compatibles con la API de OpenAI
+  - name: Grok
+    description: Endpoints nativos de Grok (conversaciones, skills, settings, voices, suggestions, rate limits)
+  - name: Auth
+    description: Autenticación — OTP y login con contraseña
+  - name: Status
+    description: Estado del servicio
