@@ -221,11 +221,6 @@ def _first_int(fields: dict, tag: int) -> int:
         if kind == 'int': return val
     return 0
 
-def _first_raw(fields: dict, tag: int) -> bytes:
-    for kind, val in fields.get(tag, []):
-        if kind == 'raw': return val
-        if kind == 'str': return val.encode()
-    return b''
 
 def _ts_to_iso(nested_bytes: bytes) -> Optional[str]:
     """Convierte nested Google Timestamp bytes a ISO 8601 string."""
@@ -280,10 +275,6 @@ class _StreamCleaner:
                 end = self._buf.find('>', close)
                 if end == -1:
                     break
-                # Before discarding, check for completed grok:render blocks
-                segment = self._buf[:end + 1]
-                for m in _GROK_RENDER_RE.finditer(segment):
-                    self.renders.append((m.group(1), m.group(2)))
                 self._inside -= 1
                 self._buf = self._buf[end + 1:]
             else:
