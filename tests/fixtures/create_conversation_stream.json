@@ -1,0 +1,3706 @@
+{
+ "model": "imagine-agent-mode",
+ "captured": "2026-08-18 against the live grok-proxy (imagine-agent-mode)",
+ "messages": [
+  {
+   "f18": "header",
+   "f2": "Thinking about your request"
+  },
+  {
+   "f18": "header",
+   "f2": "Generando la lista de recomendaciones"
+  },
+  {
+   "f18": "header",
+   "f2": "Compilando las recomendaciones"
+  },
+  {
+   "f18": "header",
+   "f2": "Redactando las recomendaciones"
+  },
+  {
+   "f18": "header",
+   "f2": "Finalizando la lista de recomendaciones"
+  },
+  {
+   "f18": "header",
+   "f2": "Verificando los años de las películas"
+  },
+  {
+   "f18": "header",
+   "f2": "Finalizando el arreglo JSON"
+  },
+  {
+   "f18": "header",
+   "f2": "Ajustando el formato JSON"
+  },
+  {
+   "f18": "tool_usage_card",
+   "f2": "<xai:tool_usage_card>\n  <xai:tool_usage_card_id>af3ed8f7-5dc7-49aa-80b5-dbab4c11d4d6</xai:tool_usage_card_id>\n  <xai:tool_name>web_search</xai:tool_name>\n  <xai:tool_args><![CDATA[{\"query\":\"Cien años de soledad serie Netflix año de estreno\",\"num_results\":\"5\"}]]></xai:tool_args>\n</xai:tool_usage_card>"
+  },
+  {
+   "f18": "tool_usage_card",
+   "f2": "<xai:tool_usage_card>\n  <xai:tool_usage_card_id>7808dfff-f413-49a7-aaba-c82d4b970241</xai:tool_usage_card_id>\n  <xai:tool_name>web_search</xai:tool_name>\n  <xai:tool_args><![CDATA[{\"query\":\"Pablo Escobar El Patrón del Mal año de estreno\",\"num_results\":\"5\"}]]></xai:tool_args>\n</xai:tool_usage_card>"
+  },
+  {
+   "f18": "tool_usage_card",
+   "f2": "<xai:tool_usage_card>\n  <xai:tool_usage_card_id>4665483a-cb9f-4433-bede-a0e4c71768b1</xai:tool_usage_card_id>\n  <xai:tool_name>web_search</xai:tool_name>\n  <xai:tool_args><![CDATA[{\"query\":\"películas y series populares en Colombia 2024 2025\",\"num_results\":\"10\"}]]></xai:tool_args>\n</xai:tool_usage_card>"
+  },
+  {
+   "f18": "tool_usage_card",
+   "f2": "<xai:tool_usage_card>\n  <xai:tool_usage_card_id>fd4ca9a4-bbce-46e7-962a-d76c025d66c3</xai:tool_usage_card_id>\n  <xai:tool_name>web_search</xai:tool_name>\n  <xai:tool_args><![CDATA[{\"query\":\"Encanto película año\",\"num_results\":\"3\"}]]></xai:tool_args>\n</xai:tool_usage_card>"
+  },
+  {
+   "f18": "header",
+   "f2": "Crafting the final JSON response"
+  },
+  {
+   "f18": "final",
+   "f2": "[\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Enc"
+  },
+  {
+   "f18": "final",
+   "f2": "anto"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "202"
+  },
+  {
+   "f18": "final",
+   "f2": "1"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "pel"
+  },
+  {
+   "f18": "final",
+   "f2": "ícula"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " una"
+  },
+  {
+   "f18": "final",
+   "f2": " chim"
+  },
+  {
+   "f18": "final",
+   "f2": "ba"
+  },
+  {
+   "f18": "final",
+   "f2": " con"
+  },
+  {
+   "f18": "final",
+   "f2": " todo"
+  },
+  {
+   "f18": "final",
+   "f2": " el"
+  },
+  {
+   "f18": "final",
+   "f2": " sabor"
+  },
+  {
+   "f18": "final",
+   "f2": " y"
+  },
+  {
+   "f18": "final",
+   "f2": " mag"
+  },
+  {
+   "f18": "final",
+   "f2": "ia"
+  },
+  {
+   "f18": "final",
+   "f2": " colomb"
+  },
+  {
+   "f18": "final",
+   "f2": "iana"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "C"
+  },
+  {
+   "f18": "header",
+   "f2": "Generating the final JSON response"
+  },
+  {
+   "f18": "final",
+   "f2": "ien"
+  },
+  {
+   "f18": "final",
+   "f2": " años"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " so"
+  },
+  {
+   "f18": "final",
+   "f2": "ledad"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "202"
+  },
+  {
+   "f18": "final",
+   "f2": "4"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " la"
+  },
+  {
+   "f18": "final",
+   "f2": " mag"
+  },
+  {
+   "f18": "final",
+   "f2": "ia"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " G"
+  },
+  {
+   "f18": "final",
+   "f2": "abo"
+  },
+  {
+   "f18": "final",
+   "f2": " he"
+  },
+  {
+   "f18": "final",
+   "f2": "cha"
+  },
+  {
+   "f18": "final",
+   "f2": " serie"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " forma"
+  },
+  {
+   "f18": "final",
+   "f2": " ép"
+  },
+  {
+   "f18": "final",
+   "f2": "ica"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "P"
+  },
+  {
+   "f18": "final",
+   "f2": "ablo"
+  },
+  {
+   "f18": "final",
+   "f2": " Esc"
+  },
+  {
+   "f18": "final",
+   "f2": "obar"
+  },
+  {
+   "f18": "final",
+   "f2": ":"
+  },
+  {
+   "f18": "final",
+   "f2": " El"
+  },
+  {
+   "f18": "final",
+   "f2": " Patr"
+  },
+  {
+   "f18": "final",
+   "f2": "ón"
+  },
+  {
+   "f18": "final",
+   "f2": " del"
+  },
+  {
+   "f18": "final",
+   "f2": " Mal"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "2"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "header",
+   "f2": "Generando la respuesta JSON final"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " la"
+  },
+  {
+   "f18": "final",
+   "f2": " historia"
+  },
+  {
+   "f18": "final",
+   "f2": " real"
+  },
+  {
+   "f18": "final",
+   "f2": " del"
+  },
+  {
+   "f18": "final",
+   "f2": " patrón"
+  },
+  {
+   "f18": "final",
+   "f2": " cont"
+  },
+  {
+   "f18": "final",
+   "f2": "ada"
+  },
+  {
+   "f18": "final",
+   "f2": " a"
+  },
+  {
+   "f18": "final",
+   "f2": " lo"
+  },
+  {
+   "f18": "final",
+   "f2": " colomb"
+  },
+  {
+   "f18": "final",
+   "f2": "iano"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Nar"
+  },
+  {
+   "f18": "final",
+   "f2": "cos"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "5"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " te"
+  },
+  {
+   "f18": "final",
+   "f2": " met"
+  },
+  {
+   "f18": "final",
+   "f2": "e"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " llen"
+  },
+  {
+   "f18": "final",
+   "f2": "o"
+  },
+  {
+   "f18": "final",
+   "f2": " en"
+  },
+  {
+   "f18": "final",
+   "f2": " el"
+  },
+  {
+   "f18": "final",
+   "f2": " mundo"
+  },
+  {
+   "f18": "final",
+   "f2": " del"
+  },
+  {
+   "f18": "final",
+   "f2": " nar"
+  },
+  {
+   "f18": "final",
+   "f2": "co"
+  },
+  {
+   "f18": "final",
+   "f2": "tráfico"
+  },
+  {
+   "f18": "final",
+   "f2": " local"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "La"
+  },
+  {
+   "f18": "final",
+   "f2": " Casa"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " Pap"
+  },
+  {
+   "f18": "final",
+   "f2": "el"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "7"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " un"
+  },
+  {
+   "f18": "final",
+   "f2": " atr"
+  },
+  {
+   "f18": "final",
+   "f2": "aco"
+  },
+  {
+   "f18": "final",
+   "f2": " ad"
+  },
+  {
+   "f18": "final",
+   "f2": "ict"
+  },
+  {
+   "f18": "final",
+   "f2": "ivo"
+  },
+  {
+   "f18": "final",
+   "f2": " que"
+  },
+  {
+   "f18": "final",
+   "f2": " te"
+  },
+  {
+   "f18": "final",
+   "f2": " deja"
+  },
+  {
+   "f18": "final",
+   "f2": " peg"
+  },
+  {
+   "f18": "final",
+   "f2": "ado"
+  },
+  {
+   "f18": "final",
+   "f2": " a"
+  },
+  {
+   "f18": "final",
+   "f2": " la"
+  },
+  {
+   "f18": "final",
+   "f2": " pantalla"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Breaking"
+  },
+  {
+   "f18": "final",
+   "f2": " Bad"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "200"
+  },
+  {
+   "f18": "final",
+   "f2": "8"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " una"
+  },
+  {
+   "f18": "final",
+   "f2": " serie"
+  },
+  {
+   "f18": "final",
+   "f2": " b"
+  },
+  {
+   "f18": "final",
+   "f2": "err"
+  },
+  {
+   "f18": "final",
+   "f2": "aca"
+  },
+  {
+   "f18": "final",
+   "f2": " que"
+  },
+  {
+   "f18": "final",
+   "f2": " te"
+  },
+  {
+   "f18": "final",
+   "f2": " atr"
+  },
+  {
+   "f18": "final",
+   "f2": "apa"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " una"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "El"
+  },
+  {
+   "f18": "final",
+   "f2": " P"
+  },
+  {
+   "f18": "final",
+   "f2": "adr"
+  },
+  {
+   "f18": "final",
+   "f2": "ino"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "197"
+  },
+  {
+   "f18": "final",
+   "f2": "2"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "pel"
+  },
+  {
+   "f18": "final",
+   "f2": "ícula"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " un"
+  },
+  {
+   "f18": "final",
+   "f2": " cl"
+  },
+  {
+   "f18": "final",
+   "f2": "ásico"
+  },
+  {
+   "f18": "final",
+   "f2": " int"
+  },
+  {
+   "f18": "final",
+   "f2": "ocable"
+  },
+  {
+   "f18": "final",
+   "f2": " del"
+  },
+  {
+   "f18": "final",
+   "f2": " cine"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " maf"
+  },
+  {
+   "f18": "final",
+   "f2": "ias"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Par"
+  },
+  {
+   "f18": "final",
+   "f2": "as"
+  },
+  {
+   "f18": "final",
+   "f2": "ite"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "9"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "pel"
+  },
+  {
+   "f18": "final",
+   "f2": "ícula"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " un"
+  },
+  {
+   "f18": "final",
+   "f2": " thriller"
+  },
+  {
+   "f18": "final",
+   "f2": " core"
+  },
+  {
+   "f18": "final",
+   "f2": "ano"
+  },
+  {
+   "f18": "final",
+   "f2": " que"
+  },
+  {
+   "f18": "final",
+   "f2": " te"
+  },
+  {
+   "f18": "final",
+   "f2": " s"
+  },
+  {
+   "f18": "final",
+   "f2": "aca"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " onda"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Str"
+  },
+  {
+   "f18": "final",
+   "f2": "anger"
+  },
+  {
+   "f18": "final",
+   "f2": " Things"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "6"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " tiene"
+  },
+  {
+   "f18": "final",
+   "f2": " mon"
+  },
+  {
+   "f18": "final",
+   "f2": "stru"
+  },
+  {
+   "f18": "final",
+   "f2": "os"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " nostalgia"
+  },
+  {
+   "f18": "final",
+   "f2": " y"
+  },
+  {
+   "f18": "final",
+   "f2": " am"
+  },
+  {
+   "f18": "final",
+   "f2": "istad"
+  },
+  {
+   "f18": "final",
+   "f2": " a"
+  },
+  {
+   "f18": "final",
+   "f2": " lo"
+  },
+  {
+   "f18": "final",
+   "f2": " grande"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Av"
+  },
+  {
+   "f18": "final",
+   "f2": "engers"
+  },
+  {
+   "f18": "final",
+   "f2": ":"
+  },
+  {
+   "f18": "final",
+   "f2": " End"
+  },
+  {
+   "f18": "final",
+   "f2": "game"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "9"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "pel"
+  },
+  {
+   "f18": "final",
+   "f2": "ícula"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " el"
+  },
+  {
+   "f18": "final",
+   "f2": " cierre"
+  },
+  {
+   "f18": "final",
+   "f2": " ép"
+  },
+  {
+   "f18": "final",
+   "f2": "ico"
+  },
+  {
+   "f18": "final",
+   "f2": " del"
+  },
+  {
+   "f18": "final",
+   "f2": " MCU"
+  },
+  {
+   "f18": "final",
+   "f2": " que"
+  },
+  {
+   "f18": "final",
+   "f2": " te"
+  },
+  {
+   "f18": "final",
+   "f2": " emoc"
+  },
+  {
+   "f18": "final",
+   "f2": "iona"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "El"
+  },
+  {
+   "f18": "final",
+   "f2": " J"
+  },
+  {
+   "f18": "final",
+   "f2": "uego"
+  },
+  {
+   "f18": "final",
+   "f2": " del"
+  },
+  {
+   "f18": "final",
+   "f2": " Cal"
+  },
+  {
+   "f18": "final",
+   "f2": "amar"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "202"
+  },
+  {
+   "f18": "final",
+   "f2": "1"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " una"
+  },
+  {
+   "f18": "final",
+   "f2": " sensación"
+  },
+  {
+   "f18": "final",
+   "f2": " viral"
+  },
+  {
+   "f18": "final",
+   "f2": " con"
+  },
+  {
+   "f18": "final",
+   "f2": " juegos"
+  },
+  {
+   "f18": "final",
+   "f2": " mort"
+  },
+  {
+   "f18": "final",
+   "f2": "ales"
+  },
+  {
+   "f18": "final",
+   "f2": " ch"
+  },
+  {
+   "f18": "final",
+   "f2": "é"
+  },
+  {
+   "f18": "final",
+   "f2": "ver"
+  },
+  {
+   "f18": "final",
+   "f2": "es"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Dark"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "7"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " un"
+  },
+  {
+   "f18": "final",
+   "f2": " rom"
+  },
+  {
+   "f18": "final",
+   "f2": "pecabezas"
+  },
+  {
+   "f18": "final",
+   "f2": " temporal"
+  },
+  {
+   "f18": "final",
+   "f2": " que"
+  },
+  {
+   "f18": "final",
+   "f2": " te"
+  },
+  {
+   "f18": "final",
+   "f2": " vol"
+  },
+  {
+   "f18": "final",
+   "f2": "ará"
+  },
+  {
+   "f18": "final",
+   "f2": " la"
+  },
+  {
+   "f18": "final",
+   "f2": " cabeza"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "In"
+  },
+  {
+   "f18": "final",
+   "f2": "ception"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "0"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "pel"
+  },
+  {
+   "f18": "final",
+   "f2": "ícula"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " te"
+  },
+  {
+   "f18": "final",
+   "f2": " sum"
+  },
+  {
+   "f18": "final",
+   "f2": "er"
+  },
+  {
+   "f18": "final",
+   "f2": "ge"
+  },
+  {
+   "f18": "final",
+   "f2": " en"
+  },
+  {
+   "f18": "final",
+   "f2": " sue"
+  },
+  {
+   "f18": "final",
+   "f2": "ños"
+  },
+  {
+   "f18": "final",
+   "f2": " dentro"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " sue"
+  },
+  {
+   "f18": "final",
+   "f2": "ños"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " forma"
+  },
+  {
+   "f18": "final",
+   "f2": " gen"
+  },
+  {
+   "f18": "final",
+   "f2": "ial"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Inter"
+  },
+  {
+   "f18": "final",
+   "f2": "stellar"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "4"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "pel"
+  },
+  {
+   "f18": "final",
+   "f2": "ícula"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " una"
+  },
+  {
+   "f18": "final",
+   "f2": " od"
+  },
+  {
+   "f18": "final",
+   "f2": "ise"
+  },
+  {
+   "f18": "final",
+   "f2": "a"
+  },
+  {
+   "f18": "final",
+   "f2": " espacial"
+  },
+  {
+   "f18": "final",
+   "f2": " l"
+  },
+  {
+   "f18": "final",
+   "f2": "lena"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " emoc"
+  },
+  {
+   "f18": "final",
+   "f2": "ión"
+  },
+  {
+   "f18": "final",
+   "f2": " y"
+  },
+  {
+   "f18": "final",
+   "f2": " ciencia"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Game"
+  },
+  {
+   "f18": "final",
+   "f2": " of"
+  },
+  {
+   "f18": "final",
+   "f2": " Th"
+  },
+  {
+   "f18": "final",
+   "f2": "rones"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "1"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " la"
+  },
+  {
+   "f18": "final",
+   "f2": " fantas"
+  },
+  {
+   "f18": "final",
+   "f2": "ía"
+  },
+  {
+   "f18": "final",
+   "f2": " ép"
+  },
+  {
+   "f18": "final",
+   "f2": "ica"
+  },
+  {
+   "f18": "final",
+   "f2": " con"
+  },
+  {
+   "f18": "final",
+   "f2": " drag"
+  },
+  {
+   "f18": "final",
+   "f2": "ones"
+  },
+  {
+   "f18": "final",
+   "f2": " y"
+  },
+  {
+   "f18": "final",
+   "f2": " tra"
+  },
+  {
+   "f18": "final",
+   "f2": "iciones"
+  },
+  {
+   "f18": "final",
+   "f2": " bac"
+  },
+  {
+   "f18": "final",
+   "f2": "anas"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "The"
+  },
+  {
+   "f18": "final",
+   "f2": " Witch"
+  },
+  {
+   "f18": "final",
+   "f2": "er"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "9"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " tiene"
+  },
+  {
+   "f18": "final",
+   "f2": " br"
+  },
+  {
+   "f18": "final",
+   "f2": "ujos"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " mon"
+  },
+  {
+   "f18": "final",
+   "f2": "stru"
+  },
+  {
+   "f18": "final",
+   "f2": "os"
+  },
+  {
+   "f18": "final",
+   "f2": " y"
+  },
+  {
+   "f18": "final",
+   "f2": " acción"
+  },
+  {
+   "f18": "final",
+   "f2": " bien"
+  },
+  {
+   "f18": "final",
+   "f2": " ch"
+  },
+  {
+   "f18": "final",
+   "f2": "é"
+  },
+  {
+   "f18": "final",
+   "f2": "vere"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "O"
+  },
+  {
+   "f18": "final",
+   "f2": "ppen"
+  },
+  {
+   "f18": "final",
+   "f2": "heimer"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "202"
+  },
+  {
+   "f18": "final",
+   "f2": "3"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "pel"
+  },
+  {
+   "f18": "final",
+   "f2": "ícula"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " un"
+  },
+  {
+   "f18": "final",
+   "f2": " bi"
+  },
+  {
+   "f18": "final",
+   "f2": "opic"
+  },
+  {
+   "f18": "final",
+   "f2": " intenso"
+  },
+  {
+   "f18": "final",
+   "f2": " sobre"
+  },
+  {
+   "f18": "final",
+   "f2": " la"
+  },
+  {
+   "f18": "final",
+   "f2": " bomba"
+  },
+  {
+   "f18": "final",
+   "f2": " at"
+  },
+  {
+   "f18": "final",
+   "f2": "ómica"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Barbie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "202"
+  },
+  {
+   "f18": "final",
+   "f2": "3"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "pel"
+  },
+  {
+   "f18": "final",
+   "f2": "ícula"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " divert"
+  },
+  {
+   "f18": "final",
+   "f2": "ida"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " color"
+  },
+  {
+   "f18": "final",
+   "f2": "ida"
+  },
+  {
+   "f18": "final",
+   "f2": " y"
+  },
+  {
+   "f18": "final",
+   "f2": " con"
+  },
+  {
+   "f18": "final",
+   "f2": " un"
+  },
+  {
+   "f18": "final",
+   "f2": " mensaje"
+  },
+  {
+   "f18": "final",
+   "f2": " bac"
+  },
+  {
+   "f18": "final",
+   "f2": "ano"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "The"
+  },
+  {
+   "f18": "final",
+   "f2": " Boys"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "201"
+  },
+  {
+   "f18": "final",
+   "f2": "9"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " una"
+  },
+  {
+   "f18": "final",
+   "f2": " par"
+  },
+  {
+   "f18": "final",
+   "f2": "odia"
+  },
+  {
+   "f18": "final",
+   "f2": " sang"
+  },
+  {
+   "f18": "final",
+   "f2": "ri"
+  },
+  {
+   "f18": "final",
+   "f2": "enta"
+  },
+  {
+   "f18": "final",
+   "f2": " de"
+  },
+  {
+   "f18": "final",
+   "f2": " super"
+  },
+  {
+   "f18": "final",
+   "f2": "hé"
+  },
+  {
+   "f18": "final",
+   "f2": "ro"
+  },
+  {
+   "f18": "final",
+   "f2": "es"
+  },
+  {
+   "f18": "final",
+   "f2": " que"
+  },
+  {
+   "f18": "final",
+   "f2": " en"
+  },
+  {
+   "f18": "final",
+   "f2": "gan"
+  },
+  {
+   "f18": "final",
+   "f2": "cha"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "},"
+  },
+  {
+   "f18": "final",
+   "f2": "\n"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": " {\""
+  },
+  {
+   "f18": "final",
+   "f2": "titulo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Wednesday"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "an"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " "
+  },
+  {
+   "f18": "final",
+   "f2": "202"
+  },
+  {
+   "f18": "final",
+   "f2": "2"
+  },
+  {
+   "f18": "final",
+   "f2": ","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "tipo"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "serie"
+  },
+  {
+   "f18": "final",
+   "f2": "\","
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "porque"
+  },
+  {
+   "f18": "final",
+   "f2": "\":"
+  },
+  {
+   "f18": "final",
+   "f2": " \""
+  },
+  {
+   "f18": "final",
+   "f2": "Por"
+  },
+  {
+   "f18": "final",
+   "f2": "que"
+  },
+  {
+   "f18": "final",
+   "f2": " es"
+  },
+  {
+   "f18": "final",
+   "f2": " la"
+  },
+  {
+   "f18": "final",
+   "f2": " Add"
+  },
+  {
+   "f18": "final",
+   "f2": "ams"
+  },
+  {
+   "f18": "final",
+   "f2": " en"
+  },
+  {
+   "f18": "final",
+   "f2": " un"
+  },
+  {
+   "f18": "final",
+   "f2": " mister"
+  },
+  {
+   "f18": "final",
+   "f2": "io"
+  },
+  {
+   "f18": "final",
+   "f2": " g"
+  },
+  {
+   "f18": "final",
+   "f2": "ótico"
+  },
+  {
+   "f18": "final",
+   "f2": " con"
+  },
+  {
+   "f18": "final",
+   "f2": " puro"
+  },
+  {
+   "f18": "final",
+   "f2": " estilo"
+  },
+  {
+   "f18": "final",
+   "f2": ".\""
+  },
+  {
+   "f18": "final",
+   "f2": "}\n"
+  },
+  {
+   "f18": "final",
+   "f2": "]"
+  }
+ ]
+}

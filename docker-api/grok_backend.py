@@ -143,6 +143,30 @@ def resolve_vision_model(requested: Optional[str]) -> str:
 # ── Filtro de artefactos XML y ruido interno ──────────────────────────────────
 _THINKING = re.compile(r'Thinking about your request\s*')
 
+# Kind of each message in the CreateConversationAndRespond stream (field 18).
+# 'header' is the status label the web UI shows WHILE the answer is written
+# ("Compilando las 20 recomendaciones", "Crafting the final JSON response").
+# It travels in the same field 2 as the answer, so without this check it is
+# concatenated into the content at whatever token boundary it arrives at --
+# measured on 2026-08-18 as `..."anio":1994Generando recomendaciones de
+# peliculas,"tipo":"movie"...` reaching a client through the gateway.
+#
+# The check is on the KIND, not on the wording: the labels are generated per
+# query and in the language of the query, which is why _THINKING -- a single
+# hardcoded English phrase -- only ever caught the first one.
+_STATUS_HEADER_KIND = 'header'
+
+
+def is_status_header(kind: Optional[str]) -> bool:
+    """True if a message of this kind carries a status label, not answer text.
+
+    Deliberately a DENY of the one kind known to carry labels, and not an ALLOW
+    of 'final': the stream also carries 'response_start', 'thinking_start' and
+    'raw_function_result', and an allow-list would silently swallow the answer
+    of any model family that writes under a kind not seen when this was written.
+    """
+    return kind == _STATUS_HEADER_KIND
+
 
 def _strip_xai(text: str) -> str:
     text = re.sub(r'<xai:[^>]*>.*?</xai:[^>]*>', '', text, flags=re.DOTALL)
@@ -731,6 +755,8 @@ def stream_chat(
                 for kind, val in f.get(1, []):
                     data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
                     inner = _decode_proto(data)
+                    if is_status_header(_first_str(inner, 18)):
+                        continue
                     tok = _first_str(inner, 2)
                     if tok:
                         out = cleaner.feed(tok)
