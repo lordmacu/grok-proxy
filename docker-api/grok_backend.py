@@ -814,6 +814,41 @@ def complete_chat(
     ))
 
 
+def _iso_to_epoch(iso: str | None) -> float | None:
+    """The quota's ISO-8601 reset as epoch seconds, or None if absent/unparseable.
+    Unparseable is treated as absent on purpose -- see ImageQuotaExhausted."""
+    if not iso:
+        return None
+    import datetime
+    try:
+        return datetime.datetime.fromisoformat(str(iso).replace("Z", "+00:00")).timestamp()
+    except (ValueError, TypeError):
+        return None
+
+
+class ImageQuotaExhausted(RuntimeError):
+    """Every image path is rate limited, and here is when it comes back.
+
+    A RuntimeError subclass on purpose: the endpoint already turns RuntimeError
+    into a 429, so nothing that handles the old exception changes behaviour. What
+    it adds is the DEADLINE, which is the part a consumer can act on.
+
+    The image buckets are ACCOUNT-level and daily (GetImagineQuotaInfo takes no
+    model argument), while the same `imagine-agent-mode*` models carry 999 CHAT
+    requests per HOUR -- measured 2026-08-19, 987 of them still unused with every
+    image bucket at zero. A consumer that punishes on a 429 without knowing the
+    window either retries an empty daily bucket all day, or parks a healthy route
+    for far longer than the outage.
+    """
+
+    def __init__(self, message: str, next_available_epoch: float | None = None):
+        super().__init__(message)
+        # Epoch seconds, or None when the upstream did not say. None means "no
+        # header": an invented deadline would be honoured just as literally as a
+        # real one.
+        self.next_available_epoch = next_available_epoch
+
+
 def get_imagine_quota() -> dict:
     """
     Llama grok_api.Media/GetImagineQuotaInfo.
@@ -1056,11 +1091,12 @@ def generate_image(
         return images
 
     reset_msg = f" Reset at: {next_reset}" if next_reset else ""
-    raise RuntimeError(
+    raise ImageQuotaExhausted(
         f"Image generation rate limited on all paths. "
         f"fast_quota={quota['image']['remaining']}, "
         f"quality_quota={quota['image_pro']['remaining']}."
-        f"{reset_msg} Last error: {last_error}"
+        f"{reset_msg} Last error: {last_error}",
+        next_available_epoch=_iso_to_epoch(next_reset),
     )
 
 

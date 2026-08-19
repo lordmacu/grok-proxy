@@ -435,6 +435,16 @@ def image_generations(req: ImageRequest):
 
     try:
         images = backend.generate_image(prompt, model_id=req.model, quality_mode=qmode)
+    except backend.ImageQuotaExhausted as e:
+        # The buckets are daily and account-level, so "come back later" without a
+        # WHEN leaves the consumer guessing over a window it cannot see. With the
+        # deadline it punishes this capability for exactly as long as it is out --
+        # and only this capability: the same model still has ~999 chat requests an
+        # hour.
+        headers = {}
+        if e.next_available_epoch is not None:
+            headers["Retry-After"] = str(max(0, int(e.next_available_epoch - time.time())))
+        raise HTTPException(status_code=429, detail=str(e), headers=headers)
     except RuntimeError as e:
         raise HTTPException(status_code=429, detail=str(e))
     except Exception as e:
