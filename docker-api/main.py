@@ -156,15 +156,28 @@ def list_models():
     ts     = int(time.time())
     models = []
 
-    # Aliases OpenAI-compatibles → round-robin sobre el pool completo
-    for alias in backend.MODEL_ALIASES:
-        models.append({
+    # Aliases OpenAI-compatibles → round-robin sobre el pool completo.
+    #
+    # They declare themselves as aliases in `description`. A consumer that
+    # de-duplicates (llm-libre does, on exactly this prefix) would otherwise treat
+    # nine names for ONE pool as nine independent routes: nine quality scores
+    # measuring the same thing, nine shares of the probe budget, and a public
+    # ranking claiming `claude-3-sonnet: quality 1.0` -- which is Grok 4.5 wearing
+    # a borrowed name, not Claude.
+    for alias, target in backend.MODEL_ALIASES.items():
+        pooled = target is None
+        entry = {
             "id":       alias,
             "object":   "model",
             "created":  ts,
             "owned_by": "grok",
-            "notes":    "round-robin over 13×999/h pool" if backend.MODEL_ALIASES[alias] is None else "",
-        })
+            "notes":    "round-robin over the 999/h pool" if pooled else "",
+        }
+        if pooled:
+            entry["description"] = (
+                "Alias → round-robin over the %d models in the 999/h pool"
+                % len(backend.HIGH_RATE_POOL))
+        models.append(entry)
 
     # Modelos internos directos (se puede pedir uno específico)
     for mid, info in backend.MODELS_CATALOG.items():
@@ -175,6 +188,12 @@ def list_models():
             "owned_by":      "grok",
             "rate_per_hour": info["rate"],
             "window_hours":  info["window_h"],
+            # The same fact as the two fields above with the arithmetic already
+            # done, because `rate_per_hour` is a rate per WINDOW despite its name:
+            # grok-3 reports 30 with window_hours 24, which reads as abundant and
+            # is really 1.25/h. A consumer deciding how hard it may lean on a route
+            # should not have to notice that.
+            "requests_per_hour": info["rate"] / info["window_h"],
             "notes":         info["notes"],
         })
 
@@ -319,30 +338,69 @@ async def chat_completions(req: ChatRequest):
         return JSONResponse(_full(cid, req.model, content, tool_calls))
 
 
+# ── /v1/images/quota ─────────────────────────────────────────────────────────
+@app.get("/v1/images/quota", dependencies=[Depends(verify_key)])
+def image_quota():
+    """
+    Consulta el estado del cupo de generación de imágenes (y video).
+    Llama grok_api.Media/GetImagineQuotaInfo.
+
+    Buckets:
+      image      → imágenes en modo fast  (quality_mode="fast")
+      image_pro  → imágenes en modo quality (quality_mode="quality")
+      image_edit → edición de imágenes
+      video      → generación de video
+      video_720p → video 720p
+
+    Cada bucket:
+      available          (bool)
+      remaining          (int|null)   — queries restantes en la ventana actual
+      window_secs        (int)        — tamaño de la ventana (86400 = 24h)
+      next_available_at  (str|null)   — ISO 8601 UTC del próximo reset
+    """
+    try:
+        return backend.get_imagine_quota()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
 # ── /v1/images/generations ───────────────────────────────────────────────────
 class ImageRequest(BaseModel):
-    prompt:  str
-    n:       int            = Field(default=1, ge=1, le=4)
-    size:    str            = "1024x1024"   # ignorado (Grok decide el tamaño)
-    model:   Optional[str]  = None          # None = rota entre los 3 imagine models
-    quality: str            = "standard"    # ignorado
-    style:   str            = "vivid"       # ignorado
+    prompt:       str
+    n:            int            = Field(default=1, ge=1, le=4)
+    size:         str            = "1024x1024"   # ignorado (Grok decide el tamaño)
+    model:        Optional[str]  = None          # None = rota entre los 3 imagine models
+    quality:      str            = "standard"    # "standard"=fast, "hd"=quality
+    style:        str            = "vivid"       # ignorado
+    quality_mode: Optional[str]  = None          # override explícito: "fast" | "quality"
 
 
 @app.post("/v1/images/generations", dependencies=[Depends(verify_key)])
 def image_generations(req: ImageRequest):
     """
     Genera imágenes con Grok Imagine (Aurora).
-    Rota automáticamente entre los 3 imagine-agent models (3×999/hora).
+
+    Estrategia automática (si no se pasa quality_mode):
+    - Consulta cuota disponible: si "image" (fast) tiene remaining, usa fast.
+    - Si "image" agotado, intenta "image_pro" (quality).
+    - Fallback a imagine-agent-mode variants (V1).
+
+    quality_mode override: "fast" o "quality" — fuerza un modo específico.
+    quality="hd" es equivalente a quality_mode="quality".
+
     model puede ser: imagine-agent-mode | imagine-agent-mode-dev | imagine-agent-mode-grok-4-5
-    Si no se especifica, rota entre los tres.
     """
     prompt = req.prompt
     if req.n > 1:
         prompt = f"Generate {req.n} variations of: {req.prompt}"
 
+    # Resolver quality_mode: override explícito > header quality > automático
+    qmode = req.quality_mode
+    if qmode is None and req.quality == "hd":
+        qmode = "quality"
+
     try:
-        images = backend.generate_image(prompt, model_id=req.model)
+        images = backend.generate_image(prompt, model_id=req.model, quality_mode=qmode)
     except RuntimeError as e:
         raise HTTPException(status_code=429, detail=str(e))
     except Exception as e:
@@ -362,6 +420,7 @@ def image_generations(req: ImageRequest):
                 "image_id": img.get("image_id"),
                 "asset_id": img.get("asset_id"),
                 "model":    img.get("model"),
+                "mode":     img.get("mode"),
             }
             for img in images
         ],
