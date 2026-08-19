@@ -1088,7 +1088,21 @@ def generate_image(
             last_error = f"{mid}: image generation rate limited"
             continue
 
-        return images
+        # An EMPTY result is never a success. This used to `return images`
+        # unconditionally, so a model that produced no image and did not happen to
+        # say one of the keywords above escaped as a successful empty list: the
+        # endpoint then answered a vague 503 ("the account may not have image
+        # generation access") while the real cause -- every bucket at zero, reset
+        # known -- was sitting one frame up and never reached the caller.
+        #
+        # Observed in production 2026-08-19, and the same shape as the DeepSeek
+        # mute: a refusal arriving as a tidy empty success is the worst possible
+        # form for it, because nothing downstream can tell it from "nothing to
+        # say". Falling through to the ImageQuotaExhausted below gives the caller
+        # the reason AND the deadline.
+        if images:
+            return images
+        last_error = f"{mid}: responded without an image"
 
     reset_msg = f" Reset at: {next_reset}" if next_reset else ""
     raise ImageQuotaExhausted(
