@@ -150,8 +150,26 @@ def health():
     }
 
 
+# Sustained requests/hour a model must be able to carry to be OFFERED in
+# /v1/models. Below it a model is still callable by explicit id and still fully
+# reported by /v1/models/rates -- it is simply not advertised for routing.
+#
+# Six models sit below this line: grok-4 (7 per 24h), grok-3 (30 per 24h),
+# grok-420 and grok-4-1-thinking-1129 (8 per 4h), and the two companions (10/h).
+# Underneath, grok-3 is the same Grok 4.5 the 999/h pool already serves unmetered.
+#
+# Advertising them was not free even when nothing routed to them. The gateway in
+# front runs a quality battery of five requests PER ROUTE per run -- 17% of
+# grok-3's entire daily budget for a single run. Measured 2026-08-19: that probing
+# had consumed 19 of its 30 daily requests, spent proving a scarce model works
+# while the abundant pool of the same model sat idle.
+ADVERTISE_MIN_RATE_PER_HOUR = float(os.getenv("ADVERTISE_MIN_RATE_PER_HOUR", "60"))
+
+
 # ── /v1/models ────────────────────────────────────────────────────────────────
 @app.get("/v1/models", dependencies=[Depends(verify_key)])
+
+
 def list_models():
     ts     = int(time.time())
     models = []
@@ -166,6 +184,14 @@ def list_models():
     # a borrowed name, not Claude.
     for alias, target in backend.MODEL_ALIASES.items():
         pooled = target is None
+        # An alias POINTING AT a scarce model inherits its scarcity -- `grok-3`
+        # is such an alias of itself. Filtering only the direct-model loop below
+        # let it back in through this one, with no rate fields attached, which is
+        # worse than not filtering at all: it looked abundant.
+        if not pooled:
+            info = backend.MODELS_CATALOG.get(target)
+            if info and info["rate"] / info["window_h"] < ADVERTISE_MIN_RATE_PER_HOUR:
+                continue
         entry = {
             "id":       alias,
             "object":   "model",
@@ -179,8 +205,16 @@ def list_models():
                 % len(backend.HIGH_RATE_POOL))
         models.append(entry)
 
-    # Modelos internos directos (se puede pedir uno específico)
+    # Modelos internos directos (se puede pedir uno específico).
+    #
+    # Only those that can sustain ADVERTISE_MIN_RATE_PER_HOUR are OFFERED. The
+    # `imagine-agent-mode*` agents are kept even though they declare no tools:
+    # they are three of the four routes in the consumer's entire catalogue that
+    # can generate an image, and dropping them would leave image generation on a
+    # single route with no failover.
     for mid, info in backend.MODELS_CATALOG.items():
+        if info["rate"] / info["window_h"] < ADVERTISE_MIN_RATE_PER_HOUR:
+            continue
         models.append({
             "id":            mid,
             "object":        "model",
