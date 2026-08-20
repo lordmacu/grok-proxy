@@ -55,3 +55,60 @@ def test_the_request_frame_carries_the_recovered_tags():
     assert gb._first_str(fields, 1) == "hola"     # text
     assert gb._first_str(fields, 2) == "ara"      # voice_id
     assert gb._first_str(fields, 3) == "es"       # language
+
+
+# ── text_to_speech's decode-and-accumulate loop ───────────────────────────────
+#
+# Every test above monkeypatches backend.text_to_speech wholesale, so none of
+# them exercise the streaming parser inside it. These build real AudioChunk
+# frames with the same _str_field/_bytes_field helpers the production code
+# uses (so _decode_proto runs for real) and monkeypatch only _raw_stream, the
+# network boundary.
+
+def test_multiple_chunks_concatenate_in_order(monkeypatch):
+    # The failure mode of a wrong loop is silent truncation, not an
+    # exception -- this pins the exact concatenated bytes, not just a length,
+    # and mixes an ASCII payload (decodes as _decode_proto's 'str' kind) with
+    # a non-UTF-8 payload (decodes as 'raw') so both value shapes run.
+    import grok_backend as gb
+
+    chunk1 = gb._bytes_field(1, b"AAA-ascii")           # -> 'str' kind
+    chunk2 = gb._bytes_field(1, b"\xff\xfe\x00\x01")    # -> 'raw' kind (invalid UTF-8)
+    chunk3 = gb._bytes_field(1, b"CCC-ascii")           # -> 'str' kind
+
+    monkeypatch.setattr(gb, "_raw_stream",
+                        lambda *a, **k: iter([chunk1, chunk2, chunk3]))
+
+    audio, content_type = gb.text_to_speech("hola", voice_id="ara")
+
+    assert audio == b"AAA-ascii" + b"\xff\xfe\x00\x01" + b"CCC-ascii"
+    assert content_type == "audio/mpeg"  # none of the chunks carry field 2
+
+
+def test_content_type_comes_from_the_first_chunk_that_carries_one(monkeypatch):
+    import grok_backend as gb
+
+    chunk1 = gb._bytes_field(1, b"first")   # no content_type
+    chunk2 = gb._bytes_field(1, b"second") + gb._str_field(2, "audio/wav")
+    chunk3 = gb._bytes_field(1, b"third") + gb._str_field(2, "audio/should-not-win")
+
+    monkeypatch.setattr(gb, "_raw_stream",
+                        lambda *a, **k: iter([chunk1, chunk2, chunk3]))
+
+    audio, content_type = gb.text_to_speech("hola", voice_id="ara")
+
+    assert audio == b"firstsecondthird"
+    assert content_type == "audio/wav"
+
+
+def test_content_type_falls_back_to_audio_mpeg_without_a_chunk_carrying_one(monkeypatch):
+    import grok_backend as gb
+
+    chunk1 = gb._bytes_field(1, b"only-data")
+
+    monkeypatch.setattr(gb, "_raw_stream", lambda *a, **k: iter([chunk1]))
+
+    audio, content_type = gb.text_to_speech("hola", voice_id="ara")
+
+    assert audio == b"only-data"
+    assert content_type == "audio/mpeg"
