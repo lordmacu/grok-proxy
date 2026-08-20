@@ -58,10 +58,20 @@ def effective(state: SessionState) -> dict:
     """The eleven booleans. Every value below was measured, not assumed.
 
       - `tools` is TRUE and this is the unusual one: grok returns real
-        tool_calls natively, measured 6/6 across three cases. Its own gateway
-        entry records the measurement.
+        tool_calls natively, no prompt-based emulation needed. What the
+        gateway actually measured is subtler than a pass rate: grok is a POOL
+        with aliases rather than 31 distinct models, so an id not in the
+        static catalog round-robins across backends on every call
+        (grok_backend.resolve_model). Measuring a single id once can
+        contradict measuring it again for that reason alone -- what looks like
+        a flaky model is really the roulette. The gateway declares
+        `tools: true` for the pool as a whole, with the imagine-agent-mode
+        family excepted: 0/3 on tool_calls when repeated, because those are
+        image-generation agents, not chat models.
       - `vision` is TRUE, served inside /v1/chat/completions: image_url content
-        parts are uploaded and the request is steered to a vision-capable model.
+        parts are uploaded and the request is steered to a vision-capable
+        model. The gateway measured 30 of 31 routes correctly reading a
+        4-digit code out of a test image.
       - `images` is TRUE via the imagine-agent-mode family, the only grok models
         that generate.
       - `search`, `files`, `conversations`, `audio_speech` and
