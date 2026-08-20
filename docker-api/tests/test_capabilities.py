@@ -26,7 +26,6 @@ def test_nothing_works_without_a_session():
 def test_the_capabilities_this_proxy_does_not_serve_yet_are_false():
     e = cap.effective(ACCOUNT)
     assert not e["files"]
-    assert not e["audio_transcription"]
 
 
 def test_translate_is_false_because_grok_has_no_translate_endpoint():

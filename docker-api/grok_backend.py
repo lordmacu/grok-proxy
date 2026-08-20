@@ -1246,6 +1246,35 @@ def text_to_speech(text: str, voice_id: str = "", language: str = "en",
     return bytes(audio), content_type or "audio/mpeg"
 
 
+# SpeechToTextGenerateRequest, recovered from the decompiled APK
+# (jadx_out/sources/grok_api/SpeechToTextGenerateRequest.java). The audio
+# travels BASE64 IN A STRING FIELD, not as bytes -- the field is named
+# audio_base64 and typed STRING in the APK, and sending raw bytes here would
+# produce a frame the backend cannot read.
+_STT_AUDIO_B64, _STT_FORMAT = 1, 2
+
+
+def build_stt_request(audio: bytes, audio_format: str = "mp3") -> bytes:
+    """The SpeechToTextGenerateRequest frame, separated so the wire shape can be
+    tested without a network."""
+    import base64
+    return (_str_field(_STT_AUDIO_B64, base64.b64encode(audio).decode())
+            + _str_field(_STT_FORMAT, audio_format))
+
+
+def speech_to_text(audio: bytes, audio_format: str = "mp3") -> str:
+    """Calls grok_api.Voice/SpeechToText. Returns the transcript.
+
+    UNARY (GrpcVoiceClient declares it with newCall), and chosen over
+    Voice/Transcribe because its reply carries a top-level `text` (f1) that maps
+    straight onto OpenAI's {"text": ...}, where Transcribe returns repeated
+    segments that would have to be stitched.
+    """
+    raw = _raw_unary("/grok_api.Voice/SpeechToText",
+                     build_stt_request(audio, audio_format), timeout=120)
+    return _first_str(_decode_proto(raw), 1)
+
+
 def get_rate_limit_single(model_id: str, kind: int = 0) -> dict:
     """Consulta rate limits de un modelo específico."""
     ch   = get_channel()

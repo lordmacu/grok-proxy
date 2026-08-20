@@ -111,9 +111,14 @@ def effective(state: SessionState) -> dict:
         straight to a file. Voice defaults to the first entry from
         `Voice/ListTopVoices` (grok_backend._default_voice_id) rather than a
         hardcoded id that may not exist on this account.
-      - `audio_transcription` is FALSE *for now*: the backend can do it, but
-        not yet at the path §3.4 of the contract promises. It flips in the
-        same commit that makes its endpoint real.
+      - `audio_transcription` is TRUE: `POST /v1/audio/transcriptions` calls
+        `grok_api.Voice/SpeechToText` (unary) and returns {"text": ...},
+        or plain text when `response_format: "text"`. grok has a second
+        speech-to-text RPC, `Voice/Transcribe`, deliberately not used here: it
+        returns `TranscribeResponse { 1: segments }`, a repeated structure that
+        would have to be stitched into one transcript, where SpeechToText's
+        reply already carries a top-level `text` (f1) that maps straight onto
+        this boolean's shape. See grok_backend.speech_to_text.
       - `translate` is FALSE and stays false: grok has no translate endpoint,
         and routing it through a chat turn would be a different capability
         wearing this one's name.
@@ -126,7 +131,7 @@ def effective(state: SessionState) -> dict:
         "vision":              live,
         "images":              live,
         "audio_speech":        live,
-        "audio_transcription": False,
+        "audio_transcription": live,
         "translate":           False,
         "search":              live,
         "files":               False,

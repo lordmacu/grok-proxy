@@ -809,6 +809,33 @@ def audio_speech(req: SpeechRequest):
     return Response(content=audio, media_type=content_type)
 
 
+# ── /v1/audio/transcriptions ────────────────────────────────────────────────
+@app.post("/v1/audio/transcriptions", dependencies=[Depends(verify_key)])
+async def audio_transcriptions(file: UploadFile = File(...),
+                               model: Optional[str] = Form(None),
+                               language: Optional[str] = Form(None),
+                               response_format: Optional[str] = Form(None)):
+    """Speech to text, OpenAI-shaped. Calls grok_api.Voice/SpeechToText.
+
+    `model` and `language` are accepted and ignored: grok_backend.speech_to_text
+    takes no model choice (it is one backend) and no language hint. The audio
+    format comes from the filename's extension, defaulting to mp3 when there is
+    none. `response_format: "text"` returns the transcript as plain text;
+    anything else returns the OpenAI JSON envelope {"text": ...}.
+    """
+    content = await file.read()
+    audio_format = "mp3"
+    if file.filename and "." in file.filename:
+        audio_format = file.filename.rsplit(".", 1)[-1].lower()
+    try:
+        text = backend.speech_to_text(content, audio_format=audio_format)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    if response_format == "text":
+        return Response(content=text, media_type="text/plain")
+    return {"text": text}
+
+
 # ── /grok/files ───────────────────────────────────────────────────────────────
 @app.post("/grok/files", dependencies=[Depends(verify_key)])
 def grok_upload_file(req: FileUploadRequest):
