@@ -58,6 +58,27 @@ def verify_key(authorization: str = Header(default="")):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
+# ── Capability gate ───────────────────────────────────────────────────────────
+def require_capability(name: str) -> None:
+    """Refuse with 501 when this proxy cannot serve `name` right now.
+
+    501, not 404 and not 503, and the distinction is load-bearing for the
+    gateway in front. A 404 is indistinguishable from a routing mistake. A 503
+    says "it broke" -- so the gateway retries, accumulates suspicion against the
+    route and fails over, spending attempts on something that was never going to
+    work in this configuration. 501 says: this proxy, deliberately, does not do
+    this right now.
+
+    Synchronous on purpose: capabilities.snapshot() reads one environment
+    variable, with no lock and no network.
+    """
+    if not capabilities.effective(capabilities.snapshot())[name]:
+        raise HTTPException(
+            501,
+            f"This proxy cannot serve '{name}' in its current configuration "
+            f"(see GET /health, capabilities.{name}).")
+
+
 # ── Schemas ───────────────────────────────────────────────────────────────────
 class Message(BaseModel):
     role:     str
@@ -487,6 +508,7 @@ def image_generations(req: ImageRequest):
 
     model puede ser: imagine-agent-mode | imagine-agent-mode-dev | imagine-agent-mode-grok-4-5
     """
+    require_capability("images")
     prompt = req.prompt
     if req.n > 1:
         prompt = f"Generate {req.n} variations of: {req.prompt}"
@@ -759,6 +781,7 @@ def _conversation_to_openai(conv: dict) -> dict:
 @app.get("/v1/conversations", dependencies=[Depends(verify_key)])
 def list_conversations_endpoint(limit: int = 20, cursor: str = ""):
     """List conversations, OpenAI-shaped. Aliases GET /grok/conversations."""
+    require_capability("conversations")
     try:
         result = backend.list_conversations(limit=limit, cursor=cursor)
     except Exception as e:
@@ -773,6 +796,7 @@ def get_conversation_endpoint(conversation_id: str):
     GET /grok/conversations/{conv_id}. Returns 404 when the backend gives an
     empty detail, so an unknown id is distinguishable from a real
     conversation."""
+    require_capability("conversations")
     try:
         conv = backend.get_conversation(conversation_id)
     except Exception as e:
@@ -800,6 +824,7 @@ def audio_speech(req: SpeechRequest):
     `model` are accepted and ignored: grok_backend.text_to_speech always
     asks for mp3, and TTS is one backend regardless of chat model name.
     """
+    require_capability("audio_speech")
     if not req.input.strip():
         raise HTTPException(status_code=400, detail="input must not be empty")
     try:
@@ -823,6 +848,7 @@ async def audio_transcriptions(file: UploadFile = File(...),
     none. `response_format: "text"` returns the transcript as plain text;
     anything else returns the OpenAI JSON envelope {"text": ...}.
     """
+    require_capability("audio_transcription")
     content = await file.read()
     audio_format = "mp3"
     if file.filename and "." in file.filename:
@@ -868,6 +894,27 @@ def grok_upload_file(req: FileUploadRequest):
 # chat-uploaded file has not been measured -- see capabilities.py's `files`
 # docstring bullet and grok_backend.FileDeleteNotSupported for the details
 # and the one live probe that would settle it.
+#
+# None of the four handlers below call require_capability("files"), even
+# though `files` is False. That is deliberate, not an oversight:
+#   - create_file (POST) stays ungated on purpose -- upload is real,
+#     verified, and works today; `files: false` covers the unverified
+#     list/get/delete surface, not create. Gating it would turn a working
+#     call into a manufactured 501 and contradicts capabilities.py's own
+#     docstring, which says only the GETs and DELETE answer 501.
+#   - list_files_endpoint and get_file_endpoint already refuse immediately,
+#     every time, with a reason more specific than "the boolean is false":
+#     which RPC namespace is unverified and what would settle it. Both
+#     mechanisms produce the same 501; stacking require_capability("files")
+#     in front would only shadow that detail with the generic message.
+#   - delete_file_endpoint's backend.delete_file() raises
+#     FileDeleteNotSupported synchronously, with no gRPC call attempted --
+#     already the "refuse immediately" outcome the gate exists to guarantee.
+# Adding the gate here would not change behavior (all four still 501 for an
+# anonymous session) but would break the specific detail messages that
+# tests/test_files.py asserts on for an *account* session, where the gate
+# would fire regardless of session state (files is hard-False, not
+# session-derived) and mask the more useful diagnostic.
 _FILES_REGISTRY_UNVERIFIED = (
     "Listing/fetching Grok files by id is not available: the account-wide "
     "file registry appears to live in grok_api_v2.AssetRepository "
