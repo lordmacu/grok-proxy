@@ -95,12 +95,17 @@ class ChatRequest(BaseModel):
     enabled_skills:     Optional[list[int]] = None # f74: IDs de skill [1=docx,3=pdf,4=pptx,7=xlsx]
 
 
-def resolve_disable_search(req) -> bool:
+def resolve_disable_search(req: Union[ChatRequest, AddResponseRequest]) -> bool:
     """The native `disable_search` value for a request, from either field.
 
-    Returns a bool because that is what the backend takes. The precedence is
-    `web_search` (standard, inverted) over `disable_search` (native) over the
-    default, and the default is now "search on" -- see the field comment.
+    Shared by both request models that carry a search toggle: `ChatRequest`
+    (`/v1/chat/completions`) and `AddResponseRequest`
+    (`/grok/conversations/{id}/messages`) -- `AddResponseRequest` is defined
+    later in this file but declares the same two fields, so this resolves
+    for it identically. Returns a bool because that is what the backend
+    takes. The precedence is `web_search` (standard, inverted) over
+    `disable_search` (native) over the default, and the default is now
+    "search on" -- see the field comment.
     """
     if req.web_search is not None:
         return not req.web_search
