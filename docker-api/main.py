@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 
 import grok_backend as backend
 import auth_backend as auth
+import capabilities
 
 API_KEY     = os.environ.get("API_KEY", "")
 APP_VERSION = "1.0.0"
@@ -142,11 +143,20 @@ def _full(cid: str, model: str, content: str,
 # ── /health ───────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
+    state = capabilities.snapshot()
     return {
-        "status":               "ok",
-        "version":              APP_VERSION,
-        "session_configured":   bool(os.environ.get("GROK_SESSION_TOKEN")),
-        "high_rate_pool_size":  len(backend.HIGH_RATE_POOL),
+        "status":  "ok",
+        "version": APP_VERSION,
+        # The capability contract (llm-libre spec 2026-08-20). `capabilities`
+        # is EFFECTIVE: what a request would achieve right now, so the gateway
+        # reads one boolean instead of learning what a grok session is.
+        "contract": 1,
+        "provider": "grok",
+        "auth": capabilities.auth_block(state),
+        "capabilities": capabilities.effective(state),
+        # Kept: existing dashboards and the container health check read these.
+        "session_configured":  state.mode == "account",
+        "high_rate_pool_size": len(backend.HIGH_RATE_POOL),
     }
 
 
@@ -164,6 +174,12 @@ def health():
 # had consumed 19 of its 30 daily requests, spent proving a scarce model works
 # while the abundant pool of the same model sat idle.
 ADVERTISE_MIN_RATE_PER_HOUR = float(os.getenv("ADVERTISE_MIN_RATE_PER_HOUR", "60"))
+
+# The only grok family that generates images. Reused, not redefined:
+# `backend.IMAGE_POOL` is already exactly these three ids (every model whose
+# name starts with "imagine-agent-mode"); a second definition here would drift
+# from it the first time either list changes.
+_IMAGINE_MODELS = frozenset(backend.IMAGE_POOL)
 
 
 # ── /v1/models ────────────────────────────────────────────────────────────────
@@ -230,6 +246,25 @@ def list_models():
             "requests_per_hour": info["rate"] / info["window_h"],
             "notes":         info["notes"],
         })
+
+    # --- capability contract: per-model metadata -----------------------------
+    # The provider-level block cannot say that the imagine family draws and
+    # neither chats nor sees. A per-model value may only NARROW the
+    # provider-level one -- `and provider_level[...]` is that rule applied at
+    # the source, so an anonymous process reports False for everything.
+    #
+    # `context_window` is deliberately ABSENT: grok publishes no context figure
+    # for any model, and inventing one here is exactly the mistake this contract
+    # exists to end.
+    provider_level = capabilities.effective(capabilities.snapshot())
+    for entry in models:
+        draws = entry["id"] in _IMAGINE_MODELS
+        entry["max_output_tokens"] = 0 if draws else 8192
+        entry["capabilities"] = {
+            "tools":  (not draws) and provider_level["tools"],
+            "vision": (not draws) and provider_level["vision"],
+            "images": draws and provider_level["images"],
+        }
 
     return {"object": "list", "data": models}
 
