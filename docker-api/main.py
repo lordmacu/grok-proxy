@@ -31,7 +31,7 @@ from typing import AsyncIterator, Optional, Union, Any
 
 from fastapi import (FastAPI, HTTPException, Depends, Header, Path, Query,
                       File, UploadFile, Form)
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 import grok_backend as backend
@@ -781,6 +781,32 @@ def get_conversation_endpoint(conversation_id: str):
         raise HTTPException(status_code=404,
                              detail=f"Conversation '{conversation_id}' not found")
     return _conversation_to_openai(conv)
+
+
+# ── /v1/audio/speech ─────────────────────────────────────────────────────────
+class SpeechRequest(BaseModel):
+    input:           str
+    voice:           Optional[str] = None
+    response_format: Optional[str] = None  # accepted, ignored: OpenAI clients send it
+    model:           Optional[str] = None  # accepted, ignored: OpenAI clients send it
+
+
+@app.post("/v1/audio/speech", dependencies=[Depends(verify_key)])
+def audio_speech(req: SpeechRequest):
+    """Text to speech, OpenAI-shaped. Calls grok_api.Chat/TextToSpeech.
+
+    Returns raw audio bytes, not a JSON envelope -- every OpenAI client
+    writes this response body straight to a file. `response_format` and
+    `model` are accepted and ignored: grok_backend.text_to_speech always
+    asks for mp3, and TTS is one backend regardless of chat model name.
+    """
+    if not req.input.strip():
+        raise HTTPException(status_code=400, detail="input must not be empty")
+    try:
+        audio, content_type = backend.text_to_speech(req.input, voice_id=req.voice or "")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return Response(content=audio, media_type=content_type)
 
 
 # ── /grok/files ───────────────────────────────────────────────────────────────

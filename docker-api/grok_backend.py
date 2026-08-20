@@ -1197,6 +1197,55 @@ def list_voices() -> dict:
     }
 
 
+def _default_voice_id() -> str:
+    """Picks the first top voice from ListTopVoices rather than hardcoding an
+    id that may not exist on this account."""
+    top = list_voices().get("top_voices") or []
+    return top[0].get("voice_id", "") if top else ""
+
+
+# TextToSpeechRequest, recovered from the decompiled APK
+# (jadx_out/sources/grok_api/TextToSpeechRequest.java). Only the fields this
+# proxy sends are listed; `speed` (f9) is a float and there is no float helper
+# here, so it is deliberately omitted rather than approximated.
+_TTS_TEXT, _TTS_VOICE, _TTS_LANGUAGE, _TTS_CODEC = 1, 2, 3, 4
+
+
+def build_tts_request(text: str, voice_id: str = "", language: str = "en",
+                      codec: str = "mp3") -> bytes:
+    """The TextToSpeechRequest frame. Separated from the call so the wire shape
+    can be tested without a network."""
+    return (_str_field(_TTS_TEXT, text)
+            + _str_field(_TTS_VOICE, voice_id)
+            + _str_field(_TTS_LANGUAGE, language)
+            + _str_field(_TTS_CODEC, codec))
+
+
+def text_to_speech(text: str, voice_id: str = "", language: str = "en",
+                   codec: str = "mp3") -> tuple[bytes, str]:
+    """Calls grok_api.Chat/TextToSpeech. Returns (audio bytes, content type).
+
+    STREAMING, not unary -- the APK declares it with newStreamingCall and the
+    reply is a sequence of AudioChunk (f1 = data bytes, f2 = content_type). The
+    audio is the concatenation of every chunk's f1, in order.
+
+    When voice_id is not given, resolves to the first top voice
+    (_default_voice_id) rather than sending an empty or hardcoded id.
+    """
+    if not voice_id:
+        voice_id = _default_voice_id()
+    audio, content_type = bytearray(), ""
+    for raw in _raw_stream("/grok_api.Chat/TextToSpeech",
+                           build_tts_request(text, voice_id, language, codec),
+                           timeout=120):
+        f = _decode_proto(raw)
+        for kind, val in f.get(1, []):
+            audio += val if kind == "raw" else (
+                val.encode("latin-1") if kind == "str" else b"")
+        content_type = content_type or _first_str(f, 2)
+    return bytes(audio), content_type or "audio/mpeg"
+
+
 def get_rate_limit_single(model_id: str, kind: int = 0) -> dict:
     """Consulta rate limits de un modelo específico."""
     ch   = get_channel()

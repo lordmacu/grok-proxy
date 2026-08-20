@@ -104,9 +104,16 @@ def effective(state: SessionState) -> dict:
         `conversation_id` to `id`. The native `/grok/conversations` family is
         untouched and still the richer surface (rename, delete, share,
         messages).
-      - `audio_speech` and `audio_transcription` are FALSE *for now*: the
-        backend can do both, but not yet at the paths §3.4 of the contract
-        promises. Each flips in the same commit that makes its endpoint real.
+      - `audio_speech` is TRUE: `POST /v1/audio/speech` calls
+        `grok_api.Chat/TextToSpeech` (a streaming RPC, concatenated into one
+        response) and returns raw audio bytes with the matching Content-Type
+        -- not a JSON envelope, since every OpenAI client writes this body
+        straight to a file. Voice defaults to the first entry from
+        `Voice/ListTopVoices` (grok_backend._default_voice_id) rather than a
+        hardcoded id that may not exist on this account.
+      - `audio_transcription` is FALSE *for now*: the backend can do it, but
+        not yet at the path §3.4 of the contract promises. It flips in the
+        same commit that makes its endpoint real.
       - `translate` is FALSE and stays false: grok has no translate endpoint,
         and routing it through a chat turn would be a different capability
         wearing this one's name.
@@ -118,7 +125,7 @@ def effective(state: SessionState) -> dict:
         "tools":               live,
         "vision":              live,
         "images":              live,
-        "audio_speech":        False,
+        "audio_speech":        live,
         "audio_transcription": False,
         "translate":           False,
         "search":              live,
