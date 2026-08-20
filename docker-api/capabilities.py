@@ -97,10 +97,16 @@ def effective(state: SessionState) -> dict:
         (grok_api_v2.FilesService/ListFiles is real, but it is a
         conversation-scoped virtual filesystem, not this registry -- it is
         served at GET /grok/conversations/{conv_id}/files instead.)
-      - `conversations`, `audio_speech` and `audio_transcription` are FALSE
-        *for now*: the backend can do all three, but not yet at the paths §3.4
-        of the contract promises. Each flips in the same commit that makes its
-        endpoint real.
+      - `conversations` is TRUE: `GET /v1/conversations` and
+        `GET /v1/conversations/{id}` now alias `backend.list_conversations`
+        and `backend.get_conversation` at the standard paths §3.4 promises,
+        wrapping the list as `{"object": "list", "data": [...]}` and mapping
+        `conversation_id` to `id`. The native `/grok/conversations` family is
+        untouched and still the richer surface (rename, delete, share,
+        messages).
+      - `audio_speech` and `audio_transcription` are FALSE *for now*: the
+        backend can do both, but not yet at the paths §3.4 of the contract
+        promises. Each flips in the same commit that makes its endpoint real.
       - `translate` is FALSE and stays false: grok has no translate endpoint,
         and routing it through a chat turn would be a different capability
         wearing this one's name.
@@ -117,5 +123,5 @@ def effective(state: SessionState) -> dict:
         "translate":           False,
         "search":              live,
         "files":               False,
-        "conversations":       False,
+        "conversations":       live,
     }

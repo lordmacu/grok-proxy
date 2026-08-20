@@ -742,6 +742,47 @@ def grok_list_conversation_files(conv_id: str, path: str = "", limit: int = 100)
         raise HTTPException(status_code=502, detail=str(e))
 
 
+# ── /v1/conversations ────────────────────────────────────────────────────────
+# The standard paths the capability contract's `conversations` boolean
+# promises (spec §3.4). Pure aliasing over the native /grok/conversations
+# family above: same backend calls, OpenAI-shaped list envelope, and
+# conversation_id renamed to id. The native family keeps everything else
+# (rename, delete, share, messages) that this alias does not attempt.
+def _conversation_to_openai(conv: dict) -> dict:
+    """Translate a grok_backend conversation dict into the OpenAI-shaped
+    object: conversation_id -> id, other fields passed through as-is."""
+    out = dict(conv)
+    out["id"] = out.pop("conversation_id", "")
+    return out
+
+
+@app.get("/v1/conversations", dependencies=[Depends(verify_key)])
+def list_conversations_endpoint(limit: int = 20, cursor: str = ""):
+    """List conversations, OpenAI-shaped. Aliases GET /grok/conversations."""
+    try:
+        result = backend.list_conversations(limit=limit, cursor=cursor)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    data = [_conversation_to_openai(c) for c in result.get("conversations", [])]
+    return {"object": "list", "data": data}
+
+
+@app.get("/v1/conversations/{conversation_id}", dependencies=[Depends(verify_key)])
+def get_conversation_endpoint(conversation_id: str):
+    """Fetch one conversation, OpenAI-shaped. Aliases
+    GET /grok/conversations/{conv_id}. Returns 404 when the backend gives an
+    empty detail, so an unknown id is distinguishable from a real
+    conversation."""
+    try:
+        conv = backend.get_conversation(conversation_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    if not conv:
+        raise HTTPException(status_code=404,
+                             detail=f"Conversation '{conversation_id}' not found")
+    return _conversation_to_openai(conv)
+
+
 # ── /grok/files ───────────────────────────────────────────────────────────────
 @app.post("/grok/files", dependencies=[Depends(verify_key)])
 def grok_upload_file(req: FileUploadRequest):
