@@ -1528,6 +1528,77 @@ def upload_file(filename: str, content: Optional[bytes] = None,
     }
 
 
+def list_files(limit: int = 100) -> list[dict]:
+    """
+    Calls grok_api_v2.FilesService/ListFiles.
+
+    IMPORTANT: this is NOT the same resource as UploadFile's FileMetadata.
+    Confirmed against the decompiled APK (grok_api_v2.ListFilesRequest /
+    grok_api_v2.File, jadx_out/sources/grok_api_v2/): ListFiles is a
+    conversation-scoped virtual filesystem browser, not a flat registry of
+    chat-uploaded files.
+
+      ListFilesRequest: f1=conversation_id, f2=path, f3=page_token,
+      f4=page_size (int32), f5=share_link_id. Only page_size is sent here;
+      an empty conversation_id/path asks for the server's default scope.
+
+      Each repeated entry on the response's f1 is a grok_api_v2.File, whose
+      shape has NO id field at all: f1=name, f2=path, f3=is_directory (bool),
+      f4=size (int64), f5=mime_type, f6=modified_at (Timestamp). `path` is
+      used below as the addressable id -- it is what
+      grok_api_v2.FilesService/GetFileContent keys on. Directory entries are
+      skipped since they are not "files" in the OpenAI sense.
+
+    Returns dicts shaped like upload_file's reply (file_id, mime_type,
+    storage_path, created_at) plus filename and bytes, which this RPC's File
+    message actually carries and UploadFile's reply does not.
+    """
+    raw = _raw_unary("/grok_api_v2.FilesService/ListFiles",
+                     _int_field(4, limit), timeout=15)
+    f = _decode_proto(raw)
+    files = []
+    for kind, val in f.get(1, []):
+        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        inner = _decode_proto(data)
+        if _first_int(inner, 3):  # is_directory
+            continue
+        created_at = None
+        for k2, v2 in inner.get(6, []):
+            blob = v2 if k2 == 'raw' else (v2.encode('latin-1') if k2 == 'str' else b'')
+            created_at = _ts_to_iso(blob)
+        path = _first_str(inner, 2)
+        files.append({
+            "file_id":      path,
+            "filename":     _first_str(inner, 1),
+            "mime_type":    _first_str(inner, 5),
+            "storage_path": path,
+            "bytes":        _first_int(inner, 4),
+            "created_at":   created_at,
+        })
+    return files
+
+
+class FileDeleteNotSupported(Exception):
+    """Raised by delete_file: deletion is intentionally unwired.
+
+    The only delete-shaped RPC found in the decompiled APK is
+    grok_api_v2.AssetRepository/DeleteAsset, keyed by asset_id. But
+    AssetRepository (Create/Clone/Update/Version/Share/StorageUsage, its own
+    lifecycle) is a distinct resource namespace from the file_metadata_id
+    that grok_api.Chat/UploadFile and grok_api.Chat/GetFileMetadata use --
+    grok_api_v2.FilesServiceClient itself (ListFiles's own service) has no
+    delete method at all. There is no evidence in the APK that DeleteAsset
+    accepts a chat-uploaded file id, and it is a destructive, irreversible
+    call, so this raises instead of guessing. main.py turns this into a 501.
+    """
+
+
+def delete_file(file_id: str) -> dict:
+    """Deleting a chat-uploaded file is not wired to a verified RPC. See
+    FileDeleteNotSupported for why."""
+    raise FileDeleteNotSupported(file_id)
+
+
 def delete_memory(conv_id: Optional[str] = None) -> dict:
     """
     Llama grok_api.Chat/DeleteMemory.

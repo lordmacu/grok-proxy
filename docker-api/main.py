@@ -29,7 +29,8 @@ from __future__ import annotations
 import os, time, uuid, json, base64
 from typing import AsyncIterator, Optional, Union, Any
 
-from fastapi import FastAPI, HTTPException, Depends, Header, Path, Query
+from fastapi import (FastAPI, HTTPException, Depends, Header, Path, Query,
+                      File, UploadFile, Form)
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -746,6 +747,100 @@ def grok_upload_file(req: FileUploadRequest):
         return backend.upload_file(req.filename, content=content, mime_type=req.mime_type)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+# ── /v1/files ─────────────────────────────────────────────────────────────────
+# The OpenAI-shaped surface the capability contract's `files` boolean promises.
+# `/grok/files` above is this proxy's own native surface and is untouched.
+def _iso_to_epoch(iso: Optional[str]) -> int:
+    """OpenAI's `created_at` is a Unix epoch int; grok_backend hands back ISO
+    8601 strings (or None when a timestamp could not be parsed)."""
+    if iso:
+        try:
+            import datetime
+            dt = datetime.datetime.fromisoformat(iso.rstrip("Z"))
+            return int(dt.replace(tzinfo=datetime.timezone.utc).timestamp())
+        except Exception:
+            pass
+    return int(time.time())
+
+
+def _file_to_openai(entry: dict, filename: Optional[str] = None,
+                     size: Optional[int] = None,
+                     purpose: str = "assistants") -> dict:
+    """Translate a grok_backend file dict (upload_file's or list_files'
+    entries both carry file_id/mime_type/created_at) into the OpenAI file
+    object shape. `filename`/`size` override the entry when the caller has a
+    better source (e.g. the multipart upload itself)."""
+    return {
+        "id":         entry.get("file_id", ""),
+        "object":     "file",
+        "bytes":      size if size is not None else entry.get("bytes", 0),
+        "created_at": _iso_to_epoch(entry.get("created_at")),
+        "filename":   filename or entry.get("filename") or entry.get("file_id", ""),
+        "purpose":    purpose,
+    }
+
+
+@app.post("/v1/files", dependencies=[Depends(verify_key)])
+async def create_file(file: UploadFile = File(...),
+                       purpose: str = Form("assistants")):
+    """Upload a file, OpenAI-shaped. Wraps the same grok_api.Chat/UploadFile
+    call as /grok/files."""
+    content = await file.read()
+    try:
+        result = backend.upload_file(file.filename, content=content,
+                                     mime_type=file.content_type)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return _file_to_openai(result, filename=file.filename, size=len(content),
+                           purpose=purpose)
+
+
+@app.get("/v1/files", dependencies=[Depends(verify_key)])
+def list_files_endpoint(limit: int = 100):
+    """List files, OpenAI-shaped `{object: "list", data: [...]}`."""
+    try:
+        entries = backend.list_files(limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"object": "list", "data": [_file_to_openai(e) for e in entries]}
+
+
+@app.get("/v1/files/{file_id}", dependencies=[Depends(verify_key)])
+def get_file_endpoint(file_id: str):
+    """A single file, OpenAI-shaped. There is no dedicated get-by-id RPC
+    wrapped yet, so this filters the same listing GET /v1/files uses."""
+    try:
+        entries = backend.list_files()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    for entry in entries:
+        if entry.get("file_id") == file_id:
+            return _file_to_openai(entry)
+    raise HTTPException(status_code=404, detail="File not found")
+
+
+@app.delete("/v1/files/{file_id}", dependencies=[Depends(verify_key)])
+def delete_file_endpoint(file_id: str):
+    """Delete a file, OpenAI-shaped.
+
+    NOT wired to a verified RPC: grok_backend.delete_file always raises
+    FileDeleteNotSupported (see its docstring for why DeleteAsset was not
+    trusted), which this turns into a 501 rather than silently no-op'ing or
+    guessing against a destructive call.
+    """
+    try:
+        result = backend.delete_file(file_id)
+    except backend.FileDeleteNotSupported:
+        raise HTTPException(
+            status_code=501,
+            detail="Deleting grok files is not wired to a verified RPC yet",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"id": file_id, "object": "file",
+            "deleted": bool(result.get("deleted", False))}
 
 
 # ── /grok/memory ──────────────────────────────────────────────────────────────

@@ -78,10 +78,18 @@ def effective(state: SessionState) -> dict:
         (and the conversation-message endpoints): grok's native gRPC field is
         `disable_search`, inverted and defaulting to search ON, matching what
         every other provider does. See main.resolve_disable_search.
-      - `files`, `conversations`, `audio_speech` and `audio_transcription` are
-        FALSE *for now*: the backend can do all four, but not yet at the paths
-        §3.4 of the contract promises. Each flips in the same commit that makes
-        its endpoint real.
+      - `files` is TRUE, served through the OpenAI-shaped `/v1/files` surface
+        (POST, GET, GET-by-id, DELETE): create, list and fetch-by-id route to
+        real gRPC (grok_api.Chat/UploadFile, grok_api_v2.FilesService/ListFiles).
+        Delete is the exception: the only delete-shaped RPC found in the
+        decompiled APK, grok_api_v2.AssetRepository/DeleteAsset, belongs to a
+        distinct asset-versioning resource with no established link to a chat
+        file id, so `DELETE /v1/files/{id}` answers 501 rather than guessing
+        against a destructive call. See grok_backend.FileDeleteNotSupported.
+      - `conversations`, `audio_speech` and `audio_transcription` are FALSE
+        *for now*: the backend can do all three, but not yet at the paths §3.4
+        of the contract promises. Each flips in the same commit that makes its
+        endpoint real.
       - `translate` is FALSE and stays false: grok has no translate endpoint,
         and routing it through a chat turn would be a different capability
         wearing this one's name.
@@ -97,6 +105,6 @@ def effective(state: SessionState) -> dict:
         "audio_transcription": False,
         "translate":           False,
         "search":              live,
-        "files":               False,
+        "files":               live,
         "conversations":       False,
     }
