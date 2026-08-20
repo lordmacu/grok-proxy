@@ -78,25 +78,31 @@ def effective(state: SessionState) -> dict:
         (and the conversation-message endpoints): grok's native gRPC field is
         `disable_search`, inverted and defaulting to search ON, matching what
         every other provider does. See main.resolve_disable_search.
-      - `files` is FALSE, and stays false until measured. `POST /v1/files`
-        (upload) works today, at the standard OpenAI path, backed by real
-        gRPC (grok_api.Chat/UploadFile) -- but the contract's `files` boolean
-        promises the whole surface, not just create. Grok's account-wide file
-        registry appears to live in a different namespace entirely,
+      - `files` is FALSE, and stays false until measured. Upload itself
+        works today, backed by real gRPC (grok_api.Chat/UploadFile) -- but
+        it is served at `POST /grok/files`, this proxy's own native surface,
+        not at the standard OpenAI path. All four `/v1/files*` endpoints
+        (`POST`, `GET`, `GET /{id}`, `DELETE /{id}`) answer 501: the
+        contract's `files` boolean promises the whole CRUD surface at the
+        standard path, and a capability reported false must mean every
+        endpoint under it refuses there, not just the ones that happen to
+        lack a working RPC -- so a client that trusts `files: false` is
+        never routed to a working call at `/v1/files`, even though that
+        call exists one prefix over. Grok's account-wide file registry
+        appears to live in a different namespace entirely,
         grok_api_v2.AssetRepository (ListAssetMetadata/GetAssetMetadata/
         DeleteAsset, keyed by asset_id, with fields -- mime_type, name,
         size_bytes, create_time -- that map cleanly onto an OpenAI file
         object), and whether a file uploaded via Chat/UploadFile (keyed by an
         unrelated file_metadata_id) shows up there as an asset has not been
-        measured against a live account. `GET /v1/files`, `GET /v1/files/{id}`
-        and `DELETE /v1/files/{id}` all answer 501 until that link is
-        verified. The one live probe that would settle it: upload a file via
-        /grok/files, then call grok_api_v2.AssetRepository/ListAssetMetadata
-        and check whether the returned file_id appears as an asset_id. See
-        main.py's /v1/files handlers and grok_backend.FileDeleteNotSupported.
-        (grok_api_v2.FilesService/ListFiles is real, but it is a
-        conversation-scoped virtual filesystem, not this registry -- it is
-        served at GET /grok/conversations/{conv_id}/files instead.)
+        measured against a live account. The one live probe that would
+        settle it: upload a file via /grok/files, then call
+        grok_api_v2.AssetRepository/ListAssetMetadata and check whether the
+        returned file_id appears as an asset_id. See main.py's /v1/files
+        handlers and grok_backend.FileDeleteNotSupported. (grok_api_v2.
+        FilesService/ListFiles is real, but it is a conversation-scoped
+        virtual filesystem, not this registry -- it is served at
+        GET /grok/conversations/{conv_id}/files instead.)
       - `conversations` is TRUE: `GET /v1/conversations` and
         `GET /v1/conversations/{id}` now alias `backend.list_conversations`
         and `backend.get_conversation` at the standard paths §3.4 promises,

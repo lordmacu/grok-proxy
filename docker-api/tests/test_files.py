@@ -16,18 +16,28 @@ def _client(monkeypatch):
     return TestClient(main.app)
 
 
-def test_upload_returns_the_openai_shape(monkeypatch):
-    monkeypatch.setattr(main.backend, "upload_file", lambda *a, **k: UPLOADED)
+def test_upload_via_the_standard_path_is_501_and_points_to_grok_files(monkeypatch):
+    # `files` is false, and per the contract that means every /v1/files*
+    # endpoint refuses there -- including create, even though the same
+    # upload RPC works fine one prefix over. backend.upload_file is
+    # deliberately NOT patched: a 200 here would mean the handler still
+    # called it, which is exactly what must not happen at this path.
     with _client(monkeypatch) as c:
         r = c.post("/v1/files", files={"file": ("a.txt", io.BytesIO(b"hi"),
                                                 "text/plain")})
+    assert r.status_code == 501
+    detail = r.json()["detail"]
+    assert "/grok/files" in detail
+
+
+def test_grok_files_still_uploads(monkeypatch):
+    # The capability's real home: /grok/files is this proxy's native
+    # surface and stays wired to the verified grok_api.Chat/UploadFile RPC.
+    monkeypatch.setattr(main.backend, "upload_file", lambda *a, **k: UPLOADED)
+    with _client(monkeypatch) as c:
+        r = c.post("/grok/files", json={"filename": "a.txt"})
     assert r.status_code == 200
-    body = r.json()
-    assert body["id"] == "file-abc"
-    assert body["object"] == "file"
-    assert body["purpose"] == "assistants"
-    assert body["filename"] == "a.txt"
-    assert isinstance(body["bytes"], int)
+    assert r.json() == UPLOADED
 
 
 def test_listing_is_501_pending_a_live_asset_probe(monkeypatch):

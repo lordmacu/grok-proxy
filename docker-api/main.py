@@ -887,34 +887,42 @@ def grok_upload_file(req: FileUploadRequest):
 
 # ── /v1/files ─────────────────────────────────────────────────────────────────
 # The OpenAI-shaped surface the capability contract's `files` boolean would
-# promise if it were fully wired. `/grok/files` above is this proxy's own
-# native surface and is untouched. Only upload is real here: grok's
-# account-wide file registry, if there is one, appears to live in a
-# different namespace (grok_api_v2.AssetRepository) whose link to a
-# chat-uploaded file has not been measured -- see capabilities.py's `files`
-# docstring bullet and grok_backend.FileDeleteNotSupported for the details
-# and the one live probe that would settle it.
+# promise if it were fully wired: create, list, get, delete, all at the
+# standard path. `files` is False, and per spec (proxy capability contract
+# §3.4) a capability reported false means EVERY endpoint under it answers
+# 501, not just the ones that happen to lack a working RPC -- "anything a
+# provider offers beyond this lives under its own prefix." Grok's verified
+# upload RPC (grok_api.Chat/UploadFile) therefore lives at `/grok/files`
+# above, this proxy's native surface, and NOT at `/v1/files`: a client that
+# trusts `files: false` must never reach a working call at the standard
+# path. See CAPABILITIES.md and capabilities.py's `files` docstring bullet.
 #
-# None of the four handlers below call require_capability("files"), even
-# though `files` is False. That is deliberate, not an oversight:
-#   - create_file (POST) stays ungated on purpose -- upload is real,
-#     verified, and works today; `files: false` covers the unverified
-#     list/get/delete surface, not create. Gating it would turn a working
-#     call into a manufactured 501 and contradicts capabilities.py's own
-#     docstring, which says only the GETs and DELETE answer 501.
-#   - list_files_endpoint and get_file_endpoint already refuse immediately,
-#     every time, with a reason more specific than "the boolean is false":
-#     which RPC namespace is unverified and what would settle it. Both
-#     mechanisms produce the same 501; stacking require_capability("files")
-#     in front would only shadow that detail with the generic message.
+# None of the four handlers below call require_capability("files") -- not
+# because they are exempt from the gate, but because each already produces
+# the exact outcome the gate exists to guarantee (immediate 501, no deep
+# gRPC failure), with a message more specific than the gate's generic one:
+#   - create_file (POST) raises _FILE_CREATE_REDIRECTED directly, naming
+#     POST /grok/files as upload's real home.
+#   - list_files_endpoint and get_file_endpoint raise
+#     _FILES_REGISTRY_UNVERIFIED directly, naming the unverified
+#     AssetRepository namespace and the live probe that would settle it.
 #   - delete_file_endpoint's backend.delete_file() raises
-#     FileDeleteNotSupported synchronously, with no gRPC call attempted --
-#     already the "refuse immediately" outcome the gate exists to guarantee.
-# Adding the gate here would not change behavior (all four still 501 for an
-# anonymous session) but would break the specific detail messages that
-# tests/test_files.py asserts on for an *account* session, where the gate
-# would fire regardless of session state (files is hard-False, not
-# session-derived) and mask the more useful diagnostic.
+#     FileDeleteNotSupported synchronously (no gRPC call attempted), caught
+#     and turned into _FILE_DELETE_UNVERIFIED.
+# Stacking require_capability("files") in front of any of these would not
+# change the status code (files is False unconditionally, so the gate would
+# also fire, every time, for every session) but would replace these
+# specific, actionable messages with the gate's generic one -- and would
+# break the tests/test_files.py assertions that pin the specific text.
+_FILE_CREATE_REDIRECTED = (
+    "Uploading a file via the standard OpenAI path is not available: "
+    "grok's verified upload RPC (grok_api.Chat/UploadFile) is served at "
+    "this proxy's native POST /grok/files, not at /v1/files. The "
+    "contract's `files` boolean promises the whole CRUD surface at the "
+    "standard path, and grok can only honor part of it -- use "
+    "POST /grok/files instead. See capabilities.py."
+)
+
 _FILES_REGISTRY_UNVERIFIED = (
     "Listing/fetching Grok files by id is not available: the account-wide "
     "file registry appears to live in grok_api_v2.AssetRepository "
@@ -934,49 +942,15 @@ _FILE_DELETE_UNVERIFIED = (
 )
 
 
-def _iso_to_epoch(iso: Optional[str]) -> int:
-    """OpenAI's `created_at` is a Unix epoch int; grok_backend hands back ISO
-    8601 strings (or None when a timestamp could not be parsed)."""
-    if iso:
-        try:
-            import datetime
-            dt = datetime.datetime.fromisoformat(iso.rstrip("Z"))
-            return int(dt.replace(tzinfo=datetime.timezone.utc).timestamp())
-        except Exception:
-            pass
-    return int(time.time())
-
-
-def _file_to_openai(entry: dict, filename: Optional[str] = None,
-                     size: Optional[int] = None,
-                     purpose: str = "assistants") -> dict:
-    """Translate a grok_backend file dict (upload_file's or list_files'
-    entries both carry file_id/mime_type/created_at) into the OpenAI file
-    object shape. `filename`/`size` override the entry when the caller has a
-    better source (e.g. the multipart upload itself)."""
-    return {
-        "id":         entry.get("file_id", ""),
-        "object":     "file",
-        "bytes":      size if size is not None else entry.get("bytes", 0),
-        "created_at": _iso_to_epoch(entry.get("created_at")),
-        "filename":   filename or entry.get("filename") or entry.get("file_id", ""),
-        "purpose":    purpose,
-    }
-
-
 @app.post("/v1/files", dependencies=[Depends(verify_key)])
-async def create_file(file: UploadFile = File(...),
-                       purpose: str = Form("assistants")):
-    """Upload a file, OpenAI-shaped. Wraps the same grok_api.Chat/UploadFile
-    call as /grok/files."""
-    content = await file.read()
-    try:
-        result = backend.upload_file(file.filename, content=content,
-                                     mime_type=file.content_type)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    return _file_to_openai(result, filename=file.filename, size=len(content),
-                           purpose=purpose)
+def create_file(file: UploadFile = File(...),
+                 purpose: str = Form("assistants")):
+    """Not wired at the standard OpenAI path: see _FILE_CREATE_REDIRECTED.
+    Upload itself is real and verified (grok_api.Chat/UploadFile), but it is
+    served at this proxy's native POST /grok/files instead -- the
+    contract's `files` boolean promises the whole CRUD surface here, and
+    grok can only honor part of it."""
+    raise HTTPException(status_code=501, detail=_FILE_CREATE_REDIRECTED)
 
 
 @app.get("/v1/files", dependencies=[Depends(verify_key)])
