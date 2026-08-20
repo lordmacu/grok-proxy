@@ -74,10 +74,14 @@ def effective(state: SessionState) -> dict:
         4-digit code out of a test image.
       - `images` is TRUE via the imagine-agent-mode family, the only grok models
         that generate.
-      - `search`, `files`, `conversations`, `audio_speech` and
-        `audio_transcription` are FALSE *for now*: the backend can do all five,
-        but not yet at the paths §3.4 of the contract promises. Each flips in
-        the same commit that makes its endpoint real.
+      - `search` is TRUE, served through `web_search` on /v1/chat/completions
+        (and the conversation-message endpoints): grok's native gRPC field is
+        `disable_search`, inverted and defaulting to search ON, matching what
+        every other provider does. See main.resolve_disable_search.
+      - `files`, `conversations`, `audio_speech` and `audio_transcription` are
+        FALSE *for now*: the backend can do all four, but not yet at the paths
+        §3.4 of the contract promises. Each flips in the same commit that makes
+        its endpoint real.
       - `translate` is FALSE and stays false: grok has no translate endpoint,
         and routing it through a chat turn would be a different capability
         wearing this one's name.
@@ -92,7 +96,7 @@ def effective(state: SessionState) -> dict:
         "audio_speech":        False,
         "audio_transcription": False,
         "translate":           False,
-        "search":              False,
+        "search":              live,
         "files":               False,
         "conversations":       False,
     }

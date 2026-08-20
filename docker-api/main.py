@@ -17,7 +17,9 @@ Parámetros OpenAI soportados:
   tools            → inyectados como contexto de sistema; respuesta parseada
   tool_choice      → ignorado (se detectan tool calls en la respuesta)
   is_reasoning     → pasa is_reasoning=True a Grok (modelos con razonamiento)
-  disable_search   → campo nativo Grok (default: True)
+  web_search       → standard field (llm-libre spec §3.4); search ON by default
+  disable_search   → grok's native field; still works, but `web_search` wins
+                      when both are present (see resolve_disable_search)
 
 Parámetros ignorados (Grok no los soporta en gRPC):
   temperature, top_p, max_tokens, stop, frequency_penalty, presence_penalty,
@@ -81,10 +83,30 @@ class ChatRequest(BaseModel):
     seed:               Optional[int]    = None
     # Extensiones Grok nativas
     is_reasoning:       bool             = False
-    disable_search:     bool             = True
+    disable_search:     Optional[bool]   = None
+    # The contract's standard name (llm-libre spec §3.4), and the default flips
+    # with it: search ON unless a caller says otherwise, which is what every
+    # other provider does and what a caller reasonably expects. `disable_search`
+    # is grok's own inverted field and keeps working for whatever already sends
+    # it; `web_search` wins when both arrive, because it is the standard one.
+    web_search:         Optional[bool]   = None
     temporary:          bool             = False   # f3: efímera, no queda en historial
     force_artifact:     bool             = False   # f40: fuerza bloque de código
     enabled_skills:     Optional[list[int]] = None # f74: IDs de skill [1=docx,3=pdf,4=pptx,7=xlsx]
+
+
+def resolve_disable_search(req) -> bool:
+    """The native `disable_search` value for a request, from either field.
+
+    Returns a bool because that is what the backend takes. The precedence is
+    `web_search` (standard, inverted) over `disable_search` (native) over the
+    default, and the default is now "search on" -- see the field comment.
+    """
+    if req.web_search is not None:
+        return not req.web_search
+    if req.disable_search is not None:
+        return req.disable_search
+    return False
 
 
 class LoginRequest(BaseModel):
@@ -353,7 +375,7 @@ async def chat_completions(req: ChatRequest):
                 for token in backend.stream_chat(
                     prompt, model_id,
                     is_reasoning=req.is_reasoning,
-                    disable_search=req.disable_search,
+                    disable_search=resolve_disable_search(req),
                     system=system,
                     image_file_ids=image_file_ids or None,
                     temporary=req.temporary,
@@ -388,7 +410,7 @@ async def chat_completions(req: ChatRequest):
             content = backend.complete_chat(
                 prompt, model_id,
                 is_reasoning=req.is_reasoning,
-                disable_search=req.disable_search,
+                disable_search=resolve_disable_search(req),
                 system=system,
                 image_file_ids=image_file_ids or None,
                 temporary=req.temporary,
@@ -637,7 +659,10 @@ class AddResponseRequest(BaseModel):
     message: str
     model:   Optional[str] = None
     stream:  bool          = False
-    disable_search: bool   = True
+    disable_search: Optional[bool] = None
+    # Same precedence as ChatRequest.web_search: standard field wins, search
+    # is on by default. See resolve_disable_search.
+    web_search:     Optional[bool] = None
 
 
 @app.post("/grok/conversations/{conv_id}/messages", dependencies=[Depends(verify_key)])
@@ -656,7 +681,7 @@ async def grok_add_response(conv_id: str, req: AddResponseRequest):
                 for token in backend.stream_add_response(
                     conv_id, req.message,
                     model_id=model_id,
-                    disable_search=req.disable_search,
+                    disable_search=resolve_disable_search(req),
                 ):
                     yield _chunk(cid, req.model or "grok", token)
             except Exception as e:
@@ -675,7 +700,7 @@ async def grok_add_response(conv_id: str, req: AddResponseRequest):
             content = backend.complete_add_response(
                 conv_id, req.message,
                 model_id=model_id,
-                disable_search=req.disable_search,
+                disable_search=resolve_disable_search(req),
             )
         except Exception as e:
             raise HTTPException(status_code=502, detail=str(e))
