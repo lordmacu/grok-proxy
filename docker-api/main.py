@@ -726,6 +726,22 @@ def grok_share_conversation(conv_id: str, resp_id: Optional[str] = None, share_p
         raise HTTPException(status_code=502, detail=str(e))
 
 
+@app.get("/grok/conversations/{conv_id}/files", dependencies=[Depends(verify_key)])
+def grok_list_conversation_files(conv_id: str, path: str = "", limit: int = 100):
+    """
+    Browses one conversation's virtual filesystem via
+    grok_api_v2.FilesService/ListFiles. This is genuinely conversation-scoped
+    (optionally scoped further by `path`, for subdirectories) -- it is NOT
+    an account-wide file registry, which is why it lives under
+    /grok/conversations rather than at /v1/files. See grok_backend.list_files.
+    """
+    try:
+        files = backend.list_files(conv_id, path=path, limit=limit)
+        return {"conversation_id": conv_id, "files": files, "count": len(files)}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
 # ── /grok/files ───────────────────────────────────────────────────────────────
 @app.post("/grok/files", dependencies=[Depends(verify_key)])
 def grok_upload_file(req: FileUploadRequest):
@@ -750,8 +766,24 @@ def grok_upload_file(req: FileUploadRequest):
 
 
 # ── /v1/files ─────────────────────────────────────────────────────────────────
-# The OpenAI-shaped surface the capability contract's `files` boolean promises.
-# `/grok/files` above is this proxy's own native surface and is untouched.
+# The OpenAI-shaped surface the capability contract's `files` boolean would
+# promise if it were fully wired. `/grok/files` above is this proxy's own
+# native surface and is untouched. Only upload is real here: grok's
+# account-wide file registry, if there is one, appears to live in a
+# different namespace (grok_api_v2.AssetRepository) whose link to a
+# chat-uploaded file has not been measured -- see capabilities.py's `files`
+# docstring bullet and grok_backend.FileDeleteNotSupported for the details
+# and the one live probe that would settle it.
+_FILES_REGISTRY_UNVERIFIED = (
+    "Listing/fetching Grok files by id is not available: the account-wide "
+    "file registry appears to live in grok_api_v2.AssetRepository "
+    "(ListAssetMetadata/GetAssetMetadata, keyed by asset_id), a different "
+    "namespace from the file_metadata_id that grok_api.Chat/UploadFile "
+    "returns, and whether a chat-uploaded file shows up there as an asset "
+    "has not been verified against a live account. See capabilities.py."
+)
+
+
 def _iso_to_epoch(iso: Optional[str]) -> int:
     """OpenAI's `created_at` is a Unix epoch int; grok_backend hands back ISO
     8601 strings (or None when a timestamp could not be parsed)."""
@@ -799,26 +831,17 @@ async def create_file(file: UploadFile = File(...),
 
 @app.get("/v1/files", dependencies=[Depends(verify_key)])
 def list_files_endpoint(limit: int = 100):
-    """List files, OpenAI-shaped `{object: "list", data: [...]}`."""
-    try:
-        entries = backend.list_files(limit=limit)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    return {"object": "list", "data": [_file_to_openai(e) for e in entries]}
+    """Not wired: see _FILES_REGISTRY_UNVERIFIED. grok_api_v2.FilesService/
+    ListFiles exists but is conversation-scoped (see grok_backend.list_files,
+    now served at GET /grok/conversations/{conv_id}/files instead), not an
+    account-wide registry an OpenAI client's bare GET /v1/files expects."""
+    raise HTTPException(status_code=501, detail=_FILES_REGISTRY_UNVERIFIED)
 
 
 @app.get("/v1/files/{file_id}", dependencies=[Depends(verify_key)])
 def get_file_endpoint(file_id: str):
-    """A single file, OpenAI-shaped. There is no dedicated get-by-id RPC
-    wrapped yet, so this filters the same listing GET /v1/files uses."""
-    try:
-        entries = backend.list_files()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    for entry in entries:
-        if entry.get("file_id") == file_id:
-            return _file_to_openai(entry)
-    raise HTTPException(status_code=404, detail="File not found")
+    """Not wired: see _FILES_REGISTRY_UNVERIFIED."""
+    raise HTTPException(status_code=501, detail=_FILES_REGISTRY_UNVERIFIED)
 
 
 @app.delete("/v1/files/{file_id}", dependencies=[Depends(verify_key)])

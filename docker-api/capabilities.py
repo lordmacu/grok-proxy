@@ -78,14 +78,25 @@ def effective(state: SessionState) -> dict:
         (and the conversation-message endpoints): grok's native gRPC field is
         `disable_search`, inverted and defaulting to search ON, matching what
         every other provider does. See main.resolve_disable_search.
-      - `files` is TRUE, served through the OpenAI-shaped `/v1/files` surface
-        (POST, GET, GET-by-id, DELETE): create, list and fetch-by-id route to
-        real gRPC (grok_api.Chat/UploadFile, grok_api_v2.FilesService/ListFiles).
-        Delete is the exception: the only delete-shaped RPC found in the
-        decompiled APK, grok_api_v2.AssetRepository/DeleteAsset, belongs to a
-        distinct asset-versioning resource with no established link to a chat
-        file id, so `DELETE /v1/files/{id}` answers 501 rather than guessing
-        against a destructive call. See grok_backend.FileDeleteNotSupported.
+      - `files` is FALSE, and stays false until measured. `POST /v1/files`
+        (upload) works today, at the standard OpenAI path, backed by real
+        gRPC (grok_api.Chat/UploadFile) -- but the contract's `files` boolean
+        promises the whole surface, not just create. Grok's account-wide file
+        registry appears to live in a different namespace entirely,
+        grok_api_v2.AssetRepository (ListAssetMetadata/GetAssetMetadata/
+        DeleteAsset, keyed by asset_id, with fields -- mime_type, name,
+        size_bytes, create_time -- that map cleanly onto an OpenAI file
+        object), and whether a file uploaded via Chat/UploadFile (keyed by an
+        unrelated file_metadata_id) shows up there as an asset has not been
+        measured against a live account. `GET /v1/files`, `GET /v1/files/{id}`
+        and `DELETE /v1/files/{id}` all answer 501 until that link is
+        verified. The one live probe that would settle it: upload a file via
+        /grok/files, then call grok_api_v2.AssetRepository/ListAssetMetadata
+        and check whether the returned file_id appears as an asset_id. See
+        main.py's /v1/files handlers and grok_backend.FileDeleteNotSupported.
+        (grok_api_v2.FilesService/ListFiles is real, but it is a
+        conversation-scoped virtual filesystem, not this registry -- it is
+        served at GET /grok/conversations/{conv_id}/files instead.)
       - `conversations`, `audio_speech` and `audio_transcription` are FALSE
         *for now*: the backend can do all three, but not yet at the paths §3.4
         of the contract promises. Each flips in the same commit that makes its
@@ -105,6 +116,6 @@ def effective(state: SessionState) -> dict:
         "audio_transcription": False,
         "translate":           False,
         "search":              live,
-        "files":               live,
+        "files":               False,
         "conversations":       False,
     }

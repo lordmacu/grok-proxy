@@ -30,40 +30,36 @@ def test_upload_returns_the_openai_shape(monkeypatch):
     assert isinstance(body["bytes"], int)
 
 
-def test_listing_returns_a_list_object(monkeypatch):
-    monkeypatch.setattr(main.backend, "list_files",
-                        lambda limit=100: [dict(UPLOADED, filename="a.txt")])
+def test_listing_is_501_pending_a_live_asset_probe(monkeypatch):
+    # grok_api_v2.FilesService/ListFiles is real but conversation-scoped (see
+    # test_conversation_files.py); it does not back this account-wide route.
+    # grok_api_v2.AssetRepository/ListAssetMetadata might, but whether a
+    # chat-uploaded file shows up there as an asset is unmeasured -- see
+    # capabilities.py's `files` docstring for the live probe that would settle it.
     with _client(monkeypatch) as c:
         r = c.get("/v1/files")
-    assert r.status_code == 200
-    body = r.json()
-    assert body["object"] == "list"
-    assert body["data"][0]["id"] == "file-abc"
+    assert r.status_code == 501
 
 
-def test_a_single_file_is_addressable(monkeypatch):
-    monkeypatch.setattr(main.backend, "list_files",
-                        lambda limit=100: [dict(UPLOADED, filename="a.txt")])
+def test_get_by_id_is_501_pending_a_live_asset_probe(monkeypatch):
     with _client(monkeypatch) as c:
         r = c.get("/v1/files/file-abc")
-    assert r.status_code == 200
-    assert r.json()["id"] == "file-abc"
+    assert r.status_code == 501
 
 
-def test_an_unknown_file_is_404(monkeypatch):
-    monkeypatch.setattr(main.backend, "list_files", lambda limit=100: [])
-    with _client(monkeypatch) as c:
-        r = c.get("/v1/files/file-nope")
-    assert r.status_code == 404
-
-
-def test_delete_returns_the_openai_shape(monkeypatch):
-    monkeypatch.setattr(main.backend, "delete_file", lambda fid: {"deleted": True})
+def test_delete_is_501_because_the_delete_rpc_is_unverified(monkeypatch):
+    # grok_backend.delete_file always raises FileDeleteNotSupported: the only
+    # delete-shaped RPC found in the decompiled APK, AssetRepository/DeleteAsset,
+    # is keyed by asset_id, a namespace with no established link to a chat
+    # file's file_metadata_id.
     with _client(monkeypatch) as c:
         r = c.delete("/v1/files/file-abc")
-    assert r.status_code == 200
-    assert r.json() == {"id": "file-abc", "object": "file", "deleted": True}
+    assert r.status_code == 501
 
 
-def test_the_contract_now_claims_files():
-    assert cap.effective(cap.SessionState(mode="account"))["files"] is True
+def test_the_contract_does_not_yet_claim_files():
+    # Flips true only after the live probe capabilities.py describes: upload
+    # a file via /grok/files, then call
+    # grok_api_v2.AssetRepository/ListAssetMetadata and check whether the
+    # returned file_id shows up as an asset_id.
+    assert cap.effective(cap.SessionState(mode="account"))["files"] is False

@@ -1528,33 +1528,33 @@ def upload_file(filename: str, content: Optional[bytes] = None,
     }
 
 
-def list_files(limit: int = 100) -> list[dict]:
+def list_files(conversation_id: str, path: str = "", limit: int = 100) -> list[dict]:
     """
-    Calls grok_api_v2.FilesService/ListFiles.
-
-    IMPORTANT: this is NOT the same resource as UploadFile's FileMetadata.
-    Confirmed against the decompiled APK (grok_api_v2.ListFilesRequest /
-    grok_api_v2.File, jadx_out/sources/grok_api_v2/): ListFiles is a
-    conversation-scoped virtual filesystem browser, not a flat registry of
-    chat-uploaded files.
+    Calls grok_api_v2.FilesService/ListFiles -- browses ONE conversation's
+    virtual filesystem. Confirmed against the decompiled APK
+    (grok_api_v2.ListFilesRequest / grok_api_v2.File,
+    jadx_out/sources/grok_api_v2/): this call is scoped by conversation_id
+    (and optionally a path within it), NOT an account-wide file registry.
+    Grok's account-wide registry, if there is one, appears to live in a
+    different namespace entirely (grok_api_v2.AssetRepository); see
+    grok_backend.FileDeleteNotSupported and main.py's /v1/files 501s for why
+    that link is not established and this function does not power them.
 
       ListFilesRequest: f1=conversation_id, f2=path, f3=page_token,
-      f4=page_size (int32), f5=share_link_id. Only page_size is sent here;
-      an empty conversation_id/path asks for the server's default scope.
+      f4=page_size (int32), f5=share_link_id.
 
       Each repeated entry on the response's f1 is a grok_api_v2.File, whose
       shape has NO id field at all: f1=name, f2=path, f3=is_directory (bool),
       f4=size (int64), f5=mime_type, f6=modified_at (Timestamp). `path` is
       used below as the addressable id -- it is what
       grok_api_v2.FilesService/GetFileContent keys on. Directory entries are
-      skipped since they are not "files" in the OpenAI sense.
-
-    Returns dicts shaped like upload_file's reply (file_id, mime_type,
-    storage_path, created_at) plus filename and bytes, which this RPC's File
-    message actually carries and UploadFile's reply does not.
+      skipped since callers of this function want files.
     """
-    raw = _raw_unary("/grok_api_v2.FilesService/ListFiles",
-                     _int_field(4, limit), timeout=15)
+    req = _str_field(1, conversation_id)
+    if path:
+        req += _str_field(2, path)
+    req += _int_field(4, limit)
+    raw = _raw_unary("/grok_api_v2.FilesService/ListFiles", req, timeout=15)
     f = _decode_proto(raw)
     files = []
     for kind, val in f.get(1, []):
@@ -1566,12 +1566,12 @@ def list_files(limit: int = 100) -> list[dict]:
         for k2, v2 in inner.get(6, []):
             blob = v2 if k2 == 'raw' else (v2.encode('latin-1') if k2 == 'str' else b'')
             created_at = _ts_to_iso(blob)
-        path = _first_str(inner, 2)
+        entry_path = _first_str(inner, 2)
         files.append({
-            "file_id":      path,
+            "file_id":      entry_path,
             "filename":     _first_str(inner, 1),
             "mime_type":    _first_str(inner, 5),
-            "storage_path": path,
+            "storage_path": entry_path,
             "bytes":        _first_int(inner, 4),
             "created_at":   created_at,
         })
