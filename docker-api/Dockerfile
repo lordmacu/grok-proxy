@@ -25,9 +25,14 @@ COPY auth_mgmt_pb2.py \
      ./
 
 # Código de la API
+# NOTE: adding a module to the codebase does not add it to the image -- this
+# COPY list is explicit by name (no `COPY . .`), so every new local module
+# must be added here in the same commit or the container crash-loops on
+# ModuleNotFoundError at startup.
 COPY docker-api/main.py \
      docker-api/grok_backend.py \
      docker-api/auth_backend.py \
+     docker-api/capabilities.py \
      ./
 
 EXPOSE 8000

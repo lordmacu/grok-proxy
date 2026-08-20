@@ -1,0 +1,88 @@
+"""What this proxy can actually do right now.
+
+Spec: the proxy capability contract, llm-libre
+docs/superpowers/specs/2026-08-20-proxy-capability-contract-design.md
+
+THE RULE: a boolean says what a request sent right now would ACHIEVE, not what
+this codebase implements. Where the two differ, the endpoint is the liar and
+this module is the correction.
+
+Where the rule STOPS: a boolean tracks entitlement, not the meter. grok's image
+quota running out is a 429 the gateway already handles with a cooldown and
+recovers from on its own; it must never flip `images`. The dividing line is
+durability -- if a fresh request tomorrow would still be refused for the same
+reason, it belongs in the boolean.
+
+Unlike chatgpt-proxy, there is no plan to resolve: grok has no tiers, and every
+RPC travels on one session token. So the whole entitlement story is whether that
+token is configured, `snapshot()` is a single environment read, and `auth_block`
+reports `plan: null` rather than inventing a tier name.
+"""
+import os
+from dataclasses import dataclass
+
+# The eleven keys the contract requires, byte-for-byte the set the gateway
+# validates against (llm_libre.contract.REQUIRED_CAPABILITIES). Duplicated
+# rather than imported because the two live in different repos and deploy
+# independently; tests/test_health_contract.py is what keeps them honest.
+REQUIRED_CAPABILITIES = (
+    "chat", "streaming", "tools", "vision", "images",
+    "audio_speech", "audio_transcription", "translate",
+    "search", "files", "conversations",
+)
+
+
+@dataclass(frozen=True)
+class SessionState:
+    mode: str          # "account" | "anonymous"
+
+
+def snapshot() -> SessionState:
+    """Whether this process has a session token. That is all grok's auth is."""
+    token = (os.environ.get("GROK_SESSION_TOKEN") or "").strip()
+    return SessionState(mode="account" if token else "anonymous")
+
+
+def auth_block(state: SessionState) -> dict:
+    """The contract's informational `auth` block.
+
+    Every field except `mode` is null on purpose: grok sells no tiers, so there
+    is no plan to name and no subscription to expire. Reporting a placeholder
+    here would be the same class of lie the contract exists to end.
+    """
+    return {"mode": state.mode, "plan": None,
+            "subscription_active": False, "expires_at": None}
+
+
+def effective(state: SessionState) -> dict:
+    """The eleven booleans. Every value below was measured, not assumed.
+
+      - `tools` is TRUE and this is the unusual one: grok returns real
+        tool_calls natively, measured 6/6 across three cases. Its own gateway
+        entry records the measurement.
+      - `vision` is TRUE, served inside /v1/chat/completions: image_url content
+        parts are uploaded and the request is steered to a vision-capable model.
+      - `images` is TRUE via the imagine-agent-mode family, the only grok models
+        that generate.
+      - `search`, `files`, `conversations`, `audio_speech` and
+        `audio_transcription` are FALSE *for now*: the backend can do all five,
+        but not yet at the paths §3.4 of the contract promises. Each flips in
+        the same commit that makes its endpoint real.
+      - `translate` is FALSE and stays false: grok has no translate endpoint,
+        and routing it through a chat turn would be a different capability
+        wearing this one's name.
+    """
+    live = state.mode == "account"
+    return {
+        "chat":                live,
+        "streaming":           live,
+        "tools":               live,
+        "vision":              live,
+        "images":              live,
+        "audio_speech":        False,
+        "audio_transcription": False,
+        "translate":           False,
+        "search":              False,
+        "files":               False,
+        "conversations":       False,
+    }
