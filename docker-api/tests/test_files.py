@@ -39,22 +39,28 @@ def test_listing_is_501_pending_a_live_asset_probe(monkeypatch):
     with _client(monkeypatch) as c:
         r = c.get("/v1/files")
     assert r.status_code == 501
+    assert "AssetRepository" in r.json()["detail"]
 
 
 def test_get_by_id_is_501_pending_a_live_asset_probe(monkeypatch):
     with _client(monkeypatch) as c:
         r = c.get("/v1/files/file-abc")
     assert r.status_code == 501
+    assert "AssetRepository" in r.json()["detail"]
 
 
 def test_delete_is_501_because_the_delete_rpc_is_unverified(monkeypatch):
     # grok_backend.delete_file always raises FileDeleteNotSupported: the only
     # delete-shaped RPC found in the decompiled APK, AssetRepository/DeleteAsset,
     # is keyed by asset_id, a namespace with no established link to a chat
-    # file's file_metadata_id.
+    # file's file_metadata_id. The 501 names that -- same specificity as the
+    # two GETs above, not a bare "not implemented".
     with _client(monkeypatch) as c:
         r = c.delete("/v1/files/file-abc")
     assert r.status_code == 501
+    detail = r.json()["detail"]
+    assert "DeleteAsset" in detail
+    assert "asset_id" in detail
 
 
 def test_the_contract_does_not_yet_claim_files():

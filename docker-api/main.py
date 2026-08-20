@@ -783,6 +783,15 @@ _FILES_REGISTRY_UNVERIFIED = (
     "has not been verified against a live account. See capabilities.py."
 )
 
+_FILE_DELETE_UNVERIFIED = (
+    "Deleting a Grok file by id is not available: the only delete-shaped "
+    "RPC found in the decompiled APK, grok_api_v2.AssetRepository/"
+    "DeleteAsset, is keyed by asset_id -- a different namespace from the "
+    "file_metadata_id that grok_api.Chat/UploadFile returns -- and "
+    "grok_api_v2.FilesService itself (ListFiles's own service) has no "
+    "delete method at all. See grok_backend.FileDeleteNotSupported."
+)
+
 
 def _iso_to_epoch(iso: Optional[str]) -> int:
     """OpenAI's `created_at` is a Unix epoch int; grok_backend hands back ISO
@@ -830,7 +839,7 @@ async def create_file(file: UploadFile = File(...),
 
 
 @app.get("/v1/files", dependencies=[Depends(verify_key)])
-def list_files_endpoint(limit: int = 100):
+def list_files_endpoint():
     """Not wired: see _FILES_REGISTRY_UNVERIFIED. grok_api_v2.FilesService/
     ListFiles exists but is conversation-scoped (see grok_backend.list_files,
     now served at GET /grok/conversations/{conv_id}/files instead), not an
@@ -839,7 +848,7 @@ def list_files_endpoint(limit: int = 100):
 
 
 @app.get("/v1/files/{file_id}", dependencies=[Depends(verify_key)])
-def get_file_endpoint(file_id: str):
+def get_file_endpoint():
     """Not wired: see _FILES_REGISTRY_UNVERIFIED."""
     raise HTTPException(status_code=501, detail=_FILES_REGISTRY_UNVERIFIED)
 
@@ -856,10 +865,7 @@ def delete_file_endpoint(file_id: str):
     try:
         result = backend.delete_file(file_id)
     except backend.FileDeleteNotSupported:
-        raise HTTPException(
-            status_code=501,
-            detail="Deleting grok files is not wired to a verified RPC yet",
-        )
+        raise HTTPException(status_code=501, detail=_FILE_DELETE_UNVERIFIED)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
     return {"id": file_id, "object": "file",

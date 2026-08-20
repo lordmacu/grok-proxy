@@ -351,77 +351,13 @@ class _StreamCleaner:
         return rest
 
 
-def _list_files(conversation_id: str, timeout: int = 10) -> list[dict]:
-    """
-    Llama grok_api_v2.FilesService/ListFiles.
-    Retorna lista de dicts {filename, path, size, mime_type}.
-    Usado como fallback cuando el plugin model no emite <grok:render>.
-    """
-    try:
-        ch = get_channel()
-        call_fn = ch.unary_unary(
-            '/grok_api_v2.FilesService/ListFiles',
-            request_serializer=lambda x: x,
-            response_deserializer=lambda x: x,
-        )
-        req_bytes = _str_field(1, conversation_id)
-        resp_bytes = call_fn(req_bytes, metadata=_make_meta(), timeout=timeout)
-
-        def _parse_file_entry(data: bytes) -> dict:
-            pos = 0; result = {}
-            while pos < len(data):
-                b = data[pos]; pos += 1
-                fnum = b >> 3; wt = b & 7
-                if wt == 2:
-                    ln = 0; sh = 0
-                    while True:
-                        b2 = data[pos]; pos += 1
-                        ln |= (b2 & 0x7F) << sh; sh += 7
-                        if not (b2 & 0x80): break
-                    val = data[pos:pos+ln]
-                    result[fnum] = val.decode('utf-8', errors='replace')
-                    pos += ln
-                elif wt == 0:
-                    v = 0; sh = 0
-                    while True:
-                        b2 = data[pos]; pos += 1
-                        v |= (b2 & 0x7F) << sh; sh += 7
-                        if not (b2 & 0x80): break
-                    result[fnum] = v
-                else:
-                    break
-            return result
-
-        # Parse outer response: field 1 = repeated file entries (nested), field 2 = dir
-        files = []
-        pos = 0
-        while pos < len(resp_bytes):
-            b = resp_bytes[pos]; pos += 1
-            fnum = b >> 3; wt = b & 7
-            if wt == 2:
-                ln = 0; sh = 0
-                while True:
-                    b2 = resp_bytes[pos]; pos += 1
-                    ln |= (b2 & 0x7F) << sh; sh += 7
-                    if not (b2 & 0x80): break
-                val = resp_bytes[pos:pos+ln]
-                if fnum == 1:
-                    entry = _parse_file_entry(val)
-                    files.append({
-                        "filename":  entry.get(1, ""),
-                        "path":      entry.get(2, ""),
-                        "size":      entry.get(4, 0),
-                        "mime_type": entry.get(5, ""),
-                    })
-                pos += ln
-            elif wt == 0:
-                while resp_bytes[pos] & 0x80: pos += 1
-                pos += 1
-            else:
-                break
-        return files
-    except Exception:
-        return []
+# _list_files (the private ListFiles caller stream_chat's grok-plugins-*
+# download-link fallback used) was removed here: it was a second,
+# hand-rolled parser for grok_api_v2.FilesService/ListFiles, duplicating
+# list_files below field-for-field. The fallback now calls list_files
+# directly and adapts its richer shape at the call site. See
+# list_files's docstring and tests/test_list_files_consolidation.py,
+# which pins the fallback's output across that change.
 
 
 def _resolve_file_url(conversation_id: str, file_path: str, timeout: int = 15) -> Optional[str]:
@@ -777,13 +713,29 @@ def stream_chat(
                         else:
                             yield f"\n\n*Archivo generado: `{fname}` (URL no disponible)*"
                 elif model_id.startswith("grok-plugins-"):
-                    files = _list_files(conv_id)
+                    # list_files returns the richer, shared-helper shape
+                    # (file_id/filename/mime_type/storage_path/bytes/
+                    # created_at); adapted to what this fallback needs here,
+                    # at the call site, rather than inside list_files itself.
+                    # Swallowed deliberately, matching the old _list_files
+                    # this replaced (`except Exception: return []`): this is
+                    # a best-effort enhancement on an already-successful
+                    # response, not something that should hit the
+                    # RESOURCE_EXHAUSTED retry/rotation below or crash an
+                    # otherwise-complete stream. list_files itself must NOT
+                    # swallow -- its other caller,
+                    # GET /grok/conversations/{conv_id}/files, needs the
+                    # exception to become a 502.
+                    try:
+                        files = list_files(conv_id)
+                    except Exception:
+                        files = []
                     for f in files:
                         fname = f["filename"]
                         if fname:
                             url = _resolve_file_url(conv_id, fname)
                             if url:
-                                size_kb = f["size"] / 1024
+                                size_kb = f.get("bytes", 0) / 1024
                                 yield f"\n\n[Descargar: **{fname}**]({url}) ·  {size_kb:.1f} KB · {f['mime_type']}"
             return
 
