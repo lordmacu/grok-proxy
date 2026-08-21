@@ -228,3 +228,57 @@ def test_a_failing_retry_is_502_not_a_loop(monkeypatch):
         r = c.post("/v1/audio/speech", json={"input": "hola", "voice": "alloy"})
     assert r.status_code == 502
     assert calls == ["alloy", ""]
+
+
+# ── El contrato de audio ──────────────────────────────────────────────────────
+
+def test_the_voices_endpoint_publishes_the_limits(monkeypatch):
+    monkeypatch.setattr(cap, "snapshot", lambda: cap.SessionState(mode="account"))
+    monkeypatch.setattr(main, "API_KEY", "")
+    monkeypatch.setattr(main.backend, "list_voices",
+                        lambda: {"voices": [], "top_voices": []})
+    with TestClient(main.app) as c:
+        body = c.get("/v1/audio/voices").json()
+    assert body["max_input_chars"] == 4096
+    assert body["default_format"] == "mp3"
+
+
+def test_an_empty_voice_list_is_normal_here(monkeypatch):
+    """Las voces de Grok son clonadas por el usuario, no un catálogo. Vacío no
+    es un fallo, y el endpoint tiene que decirlo en vez de parecer roto."""
+    monkeypatch.setattr(cap, "snapshot", lambda: cap.SessionState(mode="account"))
+    monkeypatch.setattr(main, "API_KEY", "")
+    monkeypatch.setattr(main.backend, "list_voices",
+                        lambda: {"voices": [], "top_voices": []})
+    with TestClient(main.app) as c:
+        body = c.get("/v1/audio/voices").json()
+    assert body["voices"] == []
+    assert body["selection"] == "fallback"
+    assert "cloned" in body["note"]
+
+
+def test_a_backend_failure_does_not_break_the_listing(monkeypatch):
+    """Los límites son estáticos: publicarlos no puede depender del vendor."""
+    monkeypatch.setattr(cap, "snapshot", lambda: cap.SessionState(mode="account"))
+    monkeypatch.setattr(main, "API_KEY", "")
+
+    def boom():
+        raise RuntimeError("UNAVAILABLE")
+
+    monkeypatch.setattr(main.backend, "list_voices", boom)
+    with TestClient(main.app) as c:
+        r = c.get("/v1/audio/voices")
+    assert r.status_code == 200
+    assert r.json()["max_input_chars"] == 4096
+
+
+def test_an_over_long_input_is_rejected_before_the_backend(monkeypatch):
+    monkeypatch.setattr(cap, "snapshot", lambda: cap.SessionState(mode="account"))
+    monkeypatch.setattr(main, "API_KEY", "")
+    called = []
+    monkeypatch.setattr(main.backend, "text_to_speech",
+                        lambda *a, **k: called.append(1) or (MP3, "audio/mpeg"))
+    with TestClient(main.app) as c:
+        r = c.post("/v1/audio/speech", json={"input": "x" * 5000})
+    assert r.status_code == 400
+    assert called == []

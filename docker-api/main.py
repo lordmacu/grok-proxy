@@ -815,6 +815,47 @@ class SpeechRequest(BaseModel):
     model:           Optional[str] = None  # accepted, ignored: OpenAI clients send it
 
 
+# ── El contrato de audio, común a los cinco proxies ──────────────────────────
+# 4096 es el límite de la API de OpenAI. Este backend acepta más (medido: 5000
+# caracteres devolvieron 4.9 MB de audio), pero el tope es del contrato, no del
+# proveedor: los cinco proxies tienen que rechazar lo mismo para que un cliente
+# no descubra el límite por proveedor.
+MAX_INPUT_CHARS = 4096
+SUPPORTED_FORMATS = ("mp3",)
+
+
+@app.get("/v1/audio/voices", dependencies=[Depends(verify_key)])
+def list_audio_voices():
+    """Voces y límites de TTS. Estándar en los cinco proxies.
+
+    `voices` sale de la biblioteca de la cuenta (grok_api.Voice/ListVoices), y
+    normalmente viene VACÍA -- eso no es un fallo. Las voces de Grok son voces
+    CLONADAS por el usuario (el protocolo tiene CreateVoice y DeleteVoice); no
+    existe un catálogo de voces predefinidas que listar. Verificado llamando las
+    RPC directamente, con y sin `limit`: devuelven 0 bytes.
+
+    Por eso `selection` es "fallback" y no "random": sin catálogo no hay entre
+    qué elegir. Una voz desconocida cae a la voz interna del backend, y la
+    sustitución se informa en cabeceras.
+    """
+    try:
+        listed = backend.list_voices()
+    except Exception:
+        listed = {"voices": [], "top_voices": []}
+    names = [v.get("name") or v.get("voice_id") for v in (listed.get("voices") or [])]
+    return {
+        "default": None,
+        "voices": [n for n in names if n],
+        "openai_aliases": {},
+        "selection": "fallback",
+        "max_input_chars": MAX_INPUT_CHARS,
+        "formats": list(SUPPORTED_FORMATS),
+        "default_format": "mp3",
+        "note": ("Grok's voices are user-cloned, not a preset catalogue; an "
+                 "empty list is normal. See GET /grok/voices for the raw shape."),
+    }
+
+
 @app.post("/v1/audio/speech", dependencies=[Depends(verify_key)])
 def audio_speech(req: SpeechRequest):
     """Text to speech, OpenAI-shaped. Calls grok_api.Chat/TextToSpeech.
@@ -827,6 +868,11 @@ def audio_speech(req: SpeechRequest):
     require_capability("audio_speech")
     if not req.input.strip():
         raise HTTPException(status_code=400, detail="input must not be empty")
+    if len(req.input) > MAX_INPUT_CHARS:
+        raise HTTPException(status_code=400, detail={"error": {
+            "type": "invalid_request_error",
+            "message": f"input is {len(req.input)} characters, the limit is {MAX_INPUT_CHARS}",
+            "param": "input", "max_input_chars": MAX_INPUT_CHARS}})
 
     requested = (req.voice or "").strip()
     try:
