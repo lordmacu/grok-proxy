@@ -99,10 +99,27 @@ components:
           type: boolean
           default: false
           description: Activa el modo razonamiento (solo modelos con thinking).
+        web_search:
+          type: boolean
+          nullable: true
+          default: true
+          description: >-
+            Standard search toggle (llm-libre proxy capability contract, 3.4).
+            true grounds the answer with Grok web search; false turns it off.
+            Web search is ON by default, matching every other provider llm-libre
+            integrates. Sent as the inverse of Grok's native `disable_search`
+            proto field.
         disable_search:
           type: boolean
-          default: true
-          description: Deshabilita la búsqueda web de Grok (default true en el proxy).
+          nullable: true
+          default: false
+          description: >-
+            Grok's native, inverted toggle, kept for backward compatibility.
+            true disables web search. Precedence: `web_search` wins whenever
+            it is present, then `disable_search`, then the default -- and the
+            default is now search ON (`disable_search: false`). This is a
+            behaviour change: earlier versions of this proxy defaulted
+            `disable_search` to true. See main.resolve_disable_search.
         # OpenAI params accepted but no effect
         temperature:    { type: number }
         top_p:          { type: number }
@@ -335,9 +352,20 @@ components:
           type: boolean
           default: false
           description: Si true, la respuesta es SSE igual que /v1/chat/completions.
+        web_search:
+          type: boolean
+          nullable: true
+          default: true
+          description: >-
+            Same standard toggle, and same precedence, as
+            ChatRequest.web_search: search is ON by default.
         disable_search:
           type: boolean
-          default: true
+          nullable: true
+          default: false
+          description: >-
+            Grok's native, inverted toggle. `web_search` wins when both are
+            present. See main.resolve_disable_search.
 
     ShareConversationResponse:
       type: object
@@ -457,7 +485,11 @@ paths:
         **Detalles Grok:**
         - Los mensajes `system` se envían como `custom_instructions` (campo proto 19), no como texto prepend.
         - `is_reasoning: true` activa el modo razonamiento (modelos que lo soporten).
-        - `disable_search: true` (default) desactiva la búsqueda web.
+        - Web search is **ON by default**. Send `web_search: false` to turn it
+          off (or Grok's native `disable_search: true`). `web_search` wins when
+          both fields are present; with neither, the proxy sends
+          `disable_search: false`. Earlier versions of this proxy defaulted to
+          search off -- see `main.resolve_disable_search`.
         - Plugin models (`grok-plugins-4p6-excel`, etc.) generan archivos; cuando
           terminan, el proxy appenda `[Descargar: **nombre.xlsx**](url_gcs)` al final
           del texto. La URL es una GCS signed URL válida por 1 hora.
@@ -840,7 +872,7 @@ paths:
         | message          | f2 | string | Texto del mensaje del usuario |
         | model_name       | f3 | string | Modelo a usar                 |
         | new_msg_uuid     | f5 | string | UUID generado por el cliente  |
-        | disable_search   | f8 | bool   | Deshabilitar búsqueda web     |
+        | disable_search   | f8 | bool   | Disable web search (proxy sends false by default) |
         | enable_image_gen | f9 | bool   | Habilitar generación de imagen|
 
         El campo `f5` (new_msg_uuid) es pre-asignado por el cliente como ID del
