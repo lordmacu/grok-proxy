@@ -55,7 +55,41 @@ def auth_block(state: SessionState) -> dict:
 
 
 def effective(state: SessionState) -> dict:
-    """The eleven booleans. Every value below was measured, not assumed.
+    """The eleven booleans, and where each one's confidence comes from.
+
+    Two different standards of evidence back these values, and the difference
+    matters more here than anywhere else in this repo: this contract exists
+    to stop proxies overclaiming, so it must not open by overclaiming itself.
+
+      MEASURED against a live backend -- a real request was issued and a real
+      response was read:
+        `chat`, `streaming` (the proxy's daily path), `tools` (measured
+        live against the model pool), `vision` (30 of 31 pool routes read a
+        4-digit code out of a test image), `images` (the imagine-agent-mode
+        family, exercised live).
+
+      DERIVED from the decompiled APK's protocol -- the service name, the
+      method name and the field tags are recovered from grok's own client, the
+      request frames are built to match, and the parsing is pinned by tests
+      that stub `_raw_stream`/`_raw_unary`. What has NOT happened is a call to
+      the real RPC:
+        `audio_speech` (Chat/TextToSpeech), `audio_transcription`
+        (Voice/SpeechToText), `conversations` (Chat/ListConversations,
+        Chat/GetConversation) and `search` (the inverted `disable_search`
+        field on Chat/AddResponse).
+
+      Neither, because they are FALSE by inspection rather than by
+      measurement: `translate` (grok publishes no translate RPC at all) and
+      `files` (the upload RPC is real and verified, but the account-wide
+      registry it would need is unmeasured -- see that bullet for the one
+      live probe that would settle it).
+
+    A derived boolean is a claim the gateway will act on before anyone has
+    seen it work. If one of the four is wrong, the failure is a routed request
+    that fails, then ordinary failover and suspicion (spec section 5.4) -- and
+    the correction goes in `exceptions`, which is the strongest voice.
+
+    The per-capability detail:
 
       - `tools` is TRUE and this is the unusual one: grok returns real
         tool_calls natively, no prompt-based emulation needed. What the
