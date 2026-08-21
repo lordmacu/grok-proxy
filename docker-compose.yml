@@ -1,0 +1,39 @@
+# El volumen se declara ACÁ, en el repo, no en la configuración de la app.
+#
+# Con el build pack `dockerfile` la persistencia era algo que alguien tenía que
+# crear a mano una vez por aplicación, y que se perdía si la app se recreaba.
+# `VOLUME /app/data` en el Dockerfile tampoco alcanza: Docker crea un volumen
+# ANÓNIMO nuevo por contenedor, así que documenta la intención sin persistir
+# nada entre despliegues.
+#
+# El contexto de build es la RAÍZ, no `docker-api/`: el Dockerfile copia los
+# stubs de protobuf que viven arriba (`COPY auth_mgmt_pb2.py ...`) además de
+# `docker-api/main.py`. Con el contexto puesto en el subdirectorio, esos COPY
+# fallan y el build muere.
+#
+# Las variables se enumeran una por una a propósito. Coolify sustituye las que
+# el compose nombra; una que no esté acá no llega al contenedor, y el fallo
+# aparece en runtime como "no autenticado" en vez de como un error de arranque.
+services:
+  grok:
+    build:
+      context: .
+      dockerfile: docker-api/Dockerfile
+    ports:
+      - "8893:8000"
+    environment:
+      - API_KEY=${API_KEY:-}
+      - GROK_SESSION_TOKEN=${GROK_SESSION_TOKEN:-}
+    volumes:
+      - grok-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  grok-data:
