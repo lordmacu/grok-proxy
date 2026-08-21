@@ -827,10 +827,40 @@ def audio_speech(req: SpeechRequest):
     require_capability("audio_speech")
     if not req.input.strip():
         raise HTTPException(status_code=400, detail="input must not be empty")
+
+    requested = (req.voice or "").strip()
     try:
-        audio, content_type = backend.text_to_speech(req.input, voice_id=req.voice or "")
+        audio, content_type = backend.text_to_speech(req.input, voice_id=requested)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        # An unknown voice comes back as gRPC NOT_FOUND ("Voice 'x' not found").
+        # It used to escape as a 502 carrying a raw _MultiThreadedRendezvous
+        # dump, which is wrong twice: 502 tells the gateway in front that this
+        # route is unhealthy -- so it accumulates suspicion and fails over,
+        # punishing a working provider for a client's parameter -- and the body
+        # is a Python repr no client can act on.
+        #
+        # It does NOT become a 400 either, which is the difference from
+        # chatgpt-proxy's handling of the same mistake. A 400 has to tell the
+        # caller what IS valid, and here nothing can: this backend's own
+        # /grok/voices returns an empty list, so there is no catalogue to
+        # offer. Refusing with "unknown voice, and I cannot tell you the valid
+        # ones" is a dead end, and it would break every OpenAI client, which
+        # sends `alloy` by default.
+        #
+        # So an unknown voice retries once with this backend's default, and the
+        # substitution is REPORTED in a header rather than hidden. Only after
+        # that retry also fails is it a genuine 502.
+        message = str(e)
+        if requested and "not found" in message.lower():
+            try:
+                audio, content_type = backend.text_to_speech(req.input, voice_id="")
+            except Exception as retry_error:
+                raise HTTPException(status_code=502, detail=str(retry_error))
+            return Response(content=audio, media_type=content_type,
+                            headers={"X-Voice-Fallback": requested,
+                                     "X-Voice-Used": "default"})
+        raise HTTPException(status_code=502, detail=message)
+
     return Response(content=audio, media_type=content_type)
 
 

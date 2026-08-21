@@ -142,3 +142,89 @@ def test_a_non_ascii_audio_chunk_survives_byte_for_byte(monkeypatch):
     assert audio == expected
     assert len(audio) == 9 + 4 + 3 + 4 == 20
     assert content_type == "audio/mpeg"
+
+
+# ── Voz desconocida ───────────────────────────────────────────────────────────
+
+def _client_rejecting_voices(monkeypatch, accept=""):
+    """Un backend que sólo acepta `accept` y responde NOT_FOUND al resto.
+
+    Reproduce lo que hace grok de verdad: `voice='alloy'` -- el valor por
+    defecto de la API de OpenAI, y por lo tanto lo primero que manda cualquier
+    cliente -- vuelve como gRPC NOT_FOUND ("Voice 'alloy' not found").
+    """
+    monkeypatch.setattr(cap, "snapshot",
+                        lambda: cap.SessionState(mode="account"))
+    monkeypatch.setattr(main, "API_KEY", "")
+    calls = []
+
+    def tts(text, voice_id=""):
+        calls.append(voice_id)
+        if voice_id != accept:
+            raise RuntimeError(
+                f"<_MultiThreadedRendezvous ... details = \"Voice '{voice_id}' not found\"")
+        return (MP3, "audio/mpeg")
+
+    monkeypatch.setattr(main.backend, "text_to_speech", tts)
+    return TestClient(main.app), calls
+
+
+def test_an_unknown_voice_falls_back_to_the_default(monkeypatch):
+    """No es un 400: el catálogo de este backend viene vacío, así que un 400 no
+    podría decir qué voces son válidas — sería un callejón sin salida."""
+    client, calls = _client_rejecting_voices(monkeypatch)
+    with client as c:
+        r = c.post("/v1/audio/speech", json={"input": "hola", "voice": "alloy"})
+    assert r.status_code == 200
+    assert r.content == MP3
+    assert calls == ["alloy", ""]
+
+
+def test_the_fallback_is_reported_never_hidden(monkeypatch):
+    """Sustituir la voz en silencio sería mentir sobre lo que se devolvió."""
+    client, _ = _client_rejecting_voices(monkeypatch)
+    with client as c:
+        r = c.post("/v1/audio/speech", json={"input": "hola", "voice": "alloy"})
+    assert r.headers["X-Voice-Fallback"] == "alloy"
+    assert r.headers["X-Voice-Used"] == "default"
+
+
+def test_a_valid_voice_is_not_retried(monkeypatch):
+    client, calls = _client_rejecting_voices(monkeypatch, accept="Ara")
+    with client as c:
+        r = c.post("/v1/audio/speech", json={"input": "hola", "voice": "Ara"})
+    assert r.status_code == 200
+    assert calls == ["Ara"]
+    assert "X-Voice-Fallback" not in r.headers
+
+
+def test_a_real_backend_failure_is_still_502(monkeypatch):
+    """El fallback es sólo para NOT_FOUND: una caída real sigue siendo 502."""
+    monkeypatch.setattr(cap, "snapshot",
+                        lambda: cap.SessionState(mode="account"))
+    monkeypatch.setattr(main, "API_KEY", "")
+
+    def boom(*a, **k):
+        raise RuntimeError("UNAVAILABLE: backend is down")
+
+    monkeypatch.setattr(main.backend, "text_to_speech", boom)
+    with TestClient(main.app) as c:
+        r = c.post("/v1/audio/speech", json={"input": "hola", "voice": "alloy"})
+    assert r.status_code == 502
+
+
+def test_a_failing_retry_is_502_not_a_loop(monkeypatch):
+    monkeypatch.setattr(cap, "snapshot",
+                        lambda: cap.SessionState(mode="account"))
+    monkeypatch.setattr(main, "API_KEY", "")
+    calls = []
+
+    def always_not_found(text, voice_id=""):
+        calls.append(voice_id)
+        raise RuntimeError(f"Voice '{voice_id}' not found")
+
+    monkeypatch.setattr(main.backend, "text_to_speech", always_not_found)
+    with TestClient(main.app) as c:
+        r = c.post("/v1/audio/speech", json={"input": "hola", "voice": "alloy"})
+    assert r.status_code == 502
+    assert calls == ["alloy", ""]
