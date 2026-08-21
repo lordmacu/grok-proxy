@@ -112,3 +112,33 @@ def test_content_type_falls_back_to_audio_mpeg_without_a_chunk_carrying_one(monk
 
     assert audio == b"only-data"
     assert content_type == "audio/mpeg"
+
+
+def test_a_non_ascii_audio_chunk_survives_byte_for_byte(monkeypatch):
+    # A chunk whose bytes happen to be valid UTF-8 comes back from
+    # _decode_proto already decoded, so text_to_speech has to re-encode it.
+    # encode('utf-8') is the exact inverse of that decode; encode('latin-1')
+    # is not -- it silently shrinks b"\xc3\xa9AA" (4 bytes) to b"\xe9AA"
+    # (3 bytes) and raises outright on anything above U+00FF, which is a
+    # truncated mp3 or a 502 rather than an audible failure. Both the exact
+    # bytes and the exact length are asserted: silent shortening is the
+    # failure mode.
+    import grok_backend as gb
+
+    latin = "é".encode("utf-8")          # b"\xc3\xa9"  -- lossy under latin-1
+    above = "€".encode("utf-8")          # b"\xe2\x82\xac" -- raises under latin-1
+
+    chunk1 = gb._bytes_field(1, b"AAA-ascii")
+    chunk2 = gb._bytes_field(1, latin + b"AA")
+    chunk3 = gb._bytes_field(1, above)
+    chunk4 = gb._bytes_field(1, b"\xff\xfe\x00\x01")   # -> 'raw' kind
+
+    monkeypatch.setattr(gb, "_raw_stream",
+                        lambda *a, **k: iter([chunk1, chunk2, chunk3, chunk4]))
+
+    audio, content_type = gb.text_to_speech("hola", voice_id="ara")
+
+    expected = b"AAA-ascii" + latin + b"AA" + above + b"\xff\xfe\x00\x01"
+    assert audio == expected
+    assert len(audio) == 9 + 4 + 3 + 4 == 20
+    assert content_type == "audio/mpeg"

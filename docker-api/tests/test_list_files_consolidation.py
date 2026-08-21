@@ -92,3 +92,46 @@ def test_plugin_file_fallback_survives_a_listfiles_failure(monkeypatch):
     result = "".join(grok_backend.stream_chat("prompt", "grok-plugins-test"))
     assert "hi" in result
     assert "Descargar" not in result
+
+
+def test_plugin_file_fallback_preserves_a_non_ascii_filename(monkeypatch):
+    """A ListFiles entry whose bytes are all valid UTF-8 comes back from
+    _decode_proto as a decoded ('str', ...) value, so list_files has to
+    re-encode it to recover the nested entry. The only correct inverse of
+    the decode('utf-8') that produced it is encode('utf-8'): latin-1
+    mangles U+0080-U+00FF and raises above it, which for a nested entry
+    means a shifted length prefix and a blank or truncated filename.
+
+    The size is kept under 128 deliberately -- a larger varint puts a 0x80
+    continuation byte in the entry, the entry decodes as ('raw', ...), and
+    the re-encode path this pins never runs.
+    """
+    raw = _list_files_response("presentación.pptx", "conv-1/presentación.pptx",
+                               100, "application/pdf")
+    monkeypatch.setattr(grok_backend, "get_channel", lambda: _FakeChannel(raw))
+    monkeypatch.setattr(grok_backend, "_make_meta", lambda: [])
+    monkeypatch.setattr(grok_backend, "_stream_raw_chat",
+                        lambda req_bytes, timeout=120: _chat_chunks("conv-1", "hi"))
+    monkeypatch.setattr(grok_backend, "_resolve_file_url",
+                        lambda conv_id, file_path, timeout=15:
+                            f"https://cdn.example/{file_path}")
+
+    result = "".join(grok_backend.stream_chat("prompt", "grok-plugins-test"))
+
+    assert "[Descargar: **presentación.pptx**]" in result
+    assert "https://cdn.example/presentación.pptx" in result
+
+
+def test_list_files_preserves_a_non_ascii_filename(monkeypatch):
+    """The same invariant one level down, where GET
+    /grok/conversations/{id}/files reads it: the parsed entry itself, not
+    stream_chat's rendering of it."""
+    raw = _list_files_response("informe-año.pdf", "conv-1/informe-año.pdf",
+                               100, "application/pdf")
+    monkeypatch.setattr(grok_backend, "get_channel", lambda: _FakeChannel(raw))
+    monkeypatch.setattr(grok_backend, "_make_meta", lambda: [])
+
+    files = grok_backend.list_files("conv-1")
+
+    assert [f["filename"] for f in files] == ["informe-año.pdf"]
+    assert files[0]["storage_path"] == "conv-1/informe-año.pdf"

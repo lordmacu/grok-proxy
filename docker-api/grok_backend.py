@@ -684,12 +684,12 @@ def stream_chat(
                 f = _decode_proto(chunk)
                 if conv_id is None:
                     for kind, val in f.get(2, []):
-                        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+                        data = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
                         inner = _decode_proto(data)
                         cid = _first_str(inner, 1)
                         if cid: conv_id = cid
                 for kind, val in f.get(1, []):
-                    data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+                    data = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
                     inner = _decode_proto(data)
                     if is_status_header(_first_str(inner, 18)):
                         continue
@@ -826,7 +826,7 @@ def get_imagine_quota() -> dict:
         window = _first_int(f, 3)
         next_at = None
         for kind, val in f.get(4, []):
-            data = val if kind == 'raw' else (val.encode('latin-1') if kind == 'str' else b'')
+            data = val if kind == 'raw' else (val.encode('utf-8') if kind == 'str' else b'')
             if data:
                 tf = _decode_proto(data)
                 secs = _first_int(tf, 1)
@@ -852,7 +852,7 @@ def get_imagine_quota() -> dict:
             name = BUCKET_NAMES.get(tag)
             if name:
                 for kind, val in entries:
-                    data = val if kind == 'raw' else (val.encode('latin-1') if kind == 'str' else b'')
+                    data = val if kind == 'raw' else (val.encode('utf-8') if kind == 'str' else b'')
                     if data:
                         result[name] = _parse_quota_bucket(data)
     except Exception:
@@ -966,10 +966,10 @@ def generate_image(
             f = _decode_proto(raw_chunk)
             # Mismo parsing de URLs de imagen que V1 (streaming_image_generation_response)
             for kind, val in f.get(1, []):
-                data  = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+                data  = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
                 inner = _decode_proto(data)
                 for kind2, val2 in inner.get(12, []):
-                    img_data = val2.encode('latin-1') if kind2 == 'str' else (val2 if kind2 == 'raw' else b'')
+                    img_data = val2.encode('utf-8') if kind2 == 'str' else (val2 if kind2 == 'raw' else b'')
                     img_f = _decode_proto(img_data)
                     url   = _first_str(img_f, 1)
                     if url:
@@ -1083,7 +1083,7 @@ def list_skills(locale: str = "en-US") -> list[dict]:
     f   = _decode_proto(raw)
     skills = []
     for kind, val in f.get(1, []):
-        data  = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        data  = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
         inner = _decode_proto(data)
         skills.append({
             "skill_id":     _first_str(inner, 2),
@@ -1136,7 +1136,7 @@ def list_modes(locale: str = "en-US") -> dict:
     outer = _decode_proto(raw)
     modes = []
     for kind, val in outer.get(1, []):
-        data  = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        data  = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
         inner = _decode_proto(data)
         modes.append({
             "mode_id":      _first_str(inner, 1),
@@ -1179,15 +1179,15 @@ def list_voices() -> dict:
 
     top_voices = []
     for kind, val in top_f.get(1, []):  # repeated TopVoiceEntry
-        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        data = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
         entry = _decode_proto(data)
         for k2, v2 in entry.get(1, []):  # TopVoiceEntry.f1 = VoiceMetadata nested
-            meta_bytes = v2.encode('latin-1') if k2 == 'str' else (v2 if k2 == 'raw' else b'')
+            meta_bytes = v2.encode('utf-8') if k2 == 'str' else (v2 if k2 == 'raw' else b'')
             top_voices.append(_parse_voice_meta(meta_bytes))
 
     voices = []
     for kind, val in all_f.get(1, []):  # repeated VoiceMetadata
-        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        data = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
         voices.append(_parse_voice_meta(data))
 
     return {
@@ -1241,7 +1241,7 @@ def text_to_speech(text: str, voice_id: str = "", language: str = "en",
         f = _decode_proto(raw)
         for kind, val in f.get(1, []):
             audio += val if kind == "raw" else (
-                val.encode("latin-1") if kind == "str" else b"")
+                val.encode("utf-8") if kind == "str" else b"")
         content_type = content_type or _first_str(f, 2)
     return bytes(audio), content_type or "audio/mpeg"
 
@@ -1365,10 +1365,10 @@ def _parse_conversation(f: dict) -> dict:
     created = updated = None
     for kind, val in f.get(3, []):
         if kind == 'raw': created = _ts_to_iso(val)
-        elif kind == 'str': created = _ts_to_iso(val.encode('latin-1'))
+        elif kind == 'str': created = _ts_to_iso(val.encode('utf-8'))
     for kind, val in f.get(4, []):
         if kind == 'raw': updated = _ts_to_iso(val)
-        elif kind == 'str': updated = _ts_to_iso(val.encode('latin-1'))
+        elif kind == 'str': updated = _ts_to_iso(val.encode('utf-8'))
     return {
         "conversation_id": _first_str(f, 1),
         "title":           _first_str(f, 2),
@@ -1388,7 +1388,7 @@ def list_conversations(limit: int = 20, cursor: str = "") -> dict:
     f   = _decode_proto(raw)
     convs = []
     for kind, val in f.get(1, []):
-        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        data = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
         inner = _decode_proto(data)
         convs.append(_parse_conversation(inner))
     next_cursor = _first_str(f, 2)
@@ -1402,7 +1402,7 @@ def get_conversation(conv_id: str) -> dict:
     raw   = _raw_unary("/grok_api.Chat/GetConversation", _str_field(1, conv_id))
     outer = _decode_proto(raw)
     for kind, val in outer.get(1, []):
-        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        data = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
         return _parse_conversation(_decode_proto(data))
     return {}
 
@@ -1433,7 +1433,7 @@ def list_responses(conv_id: str) -> list[dict]:
     f    = _decode_proto(raw)
     msgs = []
     for kind, val in f.get(1, []):
-        data  = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        data  = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
         inner = _decode_proto(data)
         msgs.append({
             "response_id": _first_str(inner, 1),
@@ -1547,7 +1547,7 @@ def upload_file(filename: str, content: Optional[bytes] = None,
 
     created_at = None
     for kind, val in f.get(6, []):
-        data = val if kind == 'raw' else (val.encode('latin-1') if kind == 'str' else b'')
+        data = val if kind == 'raw' else (val.encode('utf-8') if kind == 'str' else b'')
         created_at = _ts_to_iso(data)
 
     return {
@@ -1588,13 +1588,13 @@ def list_files(conversation_id: str, path: str = "", limit: int = 100) -> list[d
     f = _decode_proto(raw)
     files = []
     for kind, val in f.get(1, []):
-        data = val.encode('latin-1') if kind == 'str' else (val if kind == 'raw' else b'')
+        data = val.encode('utf-8') if kind == 'str' else (val if kind == 'raw' else b'')
         inner = _decode_proto(data)
         if _first_int(inner, 3):  # is_directory
             continue
         created_at = None
         for k2, v2 in inner.get(6, []):
-            blob = v2 if k2 == 'raw' else (v2.encode('latin-1') if k2 == 'str' else b'')
+            blob = v2 if k2 == 'raw' else (v2.encode('utf-8') if k2 == 'str' else b'')
             created_at = _ts_to_iso(blob)
         entry_path = _first_str(inner, 2)
         files.append({
