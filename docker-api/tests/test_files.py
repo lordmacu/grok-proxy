@@ -22,12 +22,34 @@ def test_upload_via_the_standard_path_is_501_and_points_to_grok_files(monkeypatc
     # upload RPC works fine one prefix over. backend.upload_file is
     # deliberately NOT patched: a 200 here would mean the handler still
     # called it, which is exactly what must not happen at this path.
+    #
+    # NO body is sent, deliberately. While create_file declared
+    # `file: UploadFile = File(...)` and `purpose: str = Form(...)`,
+    # FastAPI validated the body before the handler ran and answered 422 to
+    # everything except a well-formed multipart upload -- so a test that
+    # sent well-formed multipart was the one case that masked the bug. A
+    # refusal must not depend on the shape of what is being refused.
     with _client(monkeypatch) as c:
-        r = c.post("/v1/files", files={"file": ("a.txt", io.BytesIO(b"hi"),
-                                                "text/plain")})
+        r = c.post("/v1/files")
     assert r.status_code == 501
     detail = r.json()["detail"]
     assert "/grok/files" in detail
+
+
+def test_upload_refuses_before_reading_any_body_shape(monkeypatch):
+    # The three shapes a client can arrive with. All three must reach the
+    # handler and get the same 501; none may be validated, and none may be
+    # buffered, on the way to a refusal. Measured before the fix:
+    # no body -> 422, json -> 422, multipart -> 501.
+    with _client(monkeypatch) as c:
+        bodies = [
+            c.post("/v1/files"),
+            c.post("/v1/files", json={"purpose": "assistants"}),
+            c.post("/v1/files", files={"file": ("a.txt", io.BytesIO(b"hi"),
+                                                "text/plain")}),
+        ]
+    assert [r.status_code for r in bodies] == [501, 501, 501]
+    assert all("/grok/files" in r.json()["detail"] for r in bodies)
 
 
 def test_grok_files_still_uploads(monkeypatch):

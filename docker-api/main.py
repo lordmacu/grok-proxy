@@ -943,13 +943,20 @@ _FILE_DELETE_UNVERIFIED = (
 
 
 @app.post("/v1/files", dependencies=[Depends(verify_key)])
-def create_file(file: UploadFile = File(...),
-                 purpose: str = Form("assistants")):
+def create_file():
     """Not wired at the standard OpenAI path: see _FILE_CREATE_REDIRECTED.
     Upload itself is real and verified (grok_api.Chat/UploadFile), but it is
     served at this proxy's native POST /grok/files instead -- the
     contract's `files` boolean promises the whole CRUD surface here, and
-    grok can only honor part of it."""
+    grok can only honor part of it.
+
+    Takes NO parameters, deliberately. Declaring `file: UploadFile = File(...)`
+    and `purpose: str = Form(...)` made FastAPI validate the multipart body
+    BEFORE the handler ran, so a request without a well-formed body got a 422
+    instead of the 501 this is here to return -- and a well-formed one was
+    buffered in full before being refused. A refusal must not depend on the
+    shape of what is being refused, and must not read a payload it will never
+    use."""
     raise HTTPException(status_code=501, detail=_FILE_CREATE_REDIRECTED)
 
 
